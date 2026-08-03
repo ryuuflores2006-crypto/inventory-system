@@ -12,17 +12,17 @@ graph TD
         DB[(Centralized Supabase DB)]
     end
 
-    subgraph branchA["Manila HQ (Branch 1)"]
+    subgraph branchA["Branch A (Branch 1)"]
         WebA[Next.js Dashboard Terminal]
         AndroidA[Floor Staff Android App]
     end
 
-    subgraph branchB["Cebu Outlet (Branch 2)"]
+    subgraph branchB["Branch B (Branch 2)"]
         WebB[Next.js Dashboard Terminal]
         AndroidB[Floor Staff Android App]
     end
 
-    subgraph branchC["Davao Hub (Branch 3)"]
+    subgraph branchC["Branch C (Branch 3)"]
         WebC[Next.js Dashboard Terminal]
         AndroidC[Floor Staff Android App]
     end

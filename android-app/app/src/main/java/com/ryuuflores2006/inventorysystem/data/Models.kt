@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class BranchLocation {
-    ManilaHQ, CebuOutlet, DavaoHub
+    BranchA, BranchB, BranchC
 }
 
 @Serializable

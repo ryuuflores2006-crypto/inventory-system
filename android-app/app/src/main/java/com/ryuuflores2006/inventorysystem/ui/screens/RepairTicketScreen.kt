@@ -31,7 +31,7 @@ fun RepairTicketScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     var issueDescription by remember { mutableStateOf("") }
     var assignedTechnician by remember { mutableStateOf("") }
     var laborCostInput by remember { mutableStateOf("") }
-    var selectedBranch by remember { mutableStateOf("Manila HQ") }
+    var selectedBranch by remember { mutableStateOf("Branch A") }
 
     var isSubmitting by remember { mutableStateOf(false) }
 
@@ -132,7 +132,7 @@ fun RepairTicketScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 onDismissRequest = { branchExpanded = false },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                listOf("Manila HQ", "Cebu Outlet", "Davao Hub").forEach { loc ->
+                listOf("Branch A", "Branch B", "Branch C").forEach { loc ->
                     DropdownMenuItem(
                         text = { Text(loc) },
                         onClick = {

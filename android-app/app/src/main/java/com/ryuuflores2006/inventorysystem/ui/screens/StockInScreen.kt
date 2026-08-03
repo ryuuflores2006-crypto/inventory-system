@@ -26,7 +26,7 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     val scrollState = rememberScrollState()
 
     var isSerialized by remember { mutableStateOf(true) }
-    var selectedBranch by remember { mutableStateOf("Manila HQ") }
+    var selectedBranch by remember { mutableStateOf("Branch A") }
 
     // Fields for Serialized Track
     var sku by remember { mutableStateOf("") }
@@ -79,7 +79,7 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 onDismissRequest = { branchExpanded = false },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                listOf("Manila HQ", "Cebu Outlet", "Davao Hub").forEach { loc ->
+                listOf("Branch A", "Branch B", "Branch C").forEach { loc ->
                     DropdownMenuItem(
                         text = { Text(loc) },
                         onClick = {

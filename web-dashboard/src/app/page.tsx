@@ -24,7 +24,7 @@ import {
 import { supabase } from '@/lib/supabase';
 
 // Types corresponding to Supabase tables
-type BranchLocation = 'Manila HQ' | 'Cebu Outlet' | 'Davao Hub';
+type BranchLocation = 'Branch A' | 'Branch B' | 'Branch C';
 type GadgetStatus = 'In Stock' | 'Reserved' | 'Sold' | 'In Transit' | 'Returned';
 type TicketStatus = 'Pending' | 'Diagnosing' | 'Waiting for Parts' | 'Repairing' | 'Ready' | 'Completed';
 type TransferStatus = 'In Transit' | 'Received' | 'Cancelled';
@@ -101,37 +101,37 @@ interface BranchTransfer {
 
 // Initial Mock Seed Data for Fallback
 const mockGadgets: RetailGadget[] = [
-  { item_id: 'g1', sku: 'SKU-IPH15P-256', brand: 'Apple', model: 'iPhone 15 Pro', storage: '256GB', ram: '8GB', color: 'Natural Titanium', cost_price: 950.00, retail_price: 1199.00, current_branch: 'Manila HQ', status: 'In Stock', imei_1: '358912345678901', imei_2: '358912345678902', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
-  { item_id: 'g2', sku: 'SKU-IPH15P-256', brand: 'Apple', model: 'iPhone 15 Pro', storage: '256GB', ram: '8GB', color: 'Blue Titanium', cost_price: 950.00, retail_price: 1199.00, current_branch: 'Cebu Outlet', status: 'In Stock', imei_1: '358912345678903', imei_2: '358912345678904', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
-  { item_id: 'g3', sku: 'SKU-SAM-S24U-512', brand: 'Samsung', model: 'Galaxy S24 Ultra', storage: '512GB', ram: '12GB', color: 'Titanium Black', cost_price: 1100.00, retail_price: 1399.00, current_branch: 'Davao Hub', status: 'In Stock', imei_1: '358912345678905', imei_2: '358912345678906', supplier_name: 'Samsung Philippines', created_at: new Date().toISOString() },
-  { item_id: 'g4', sku: 'SKU-SAM-S24U-512', brand: 'Samsung', model: 'Galaxy S24 Ultra', storage: '512GB', ram: '12GB', color: 'Titanium Gray', cost_price: 1100.00, retail_price: 1399.00, current_branch: 'Manila HQ', status: 'Sold', imei_1: '358912345678907', imei_2: '358912345678908', supplier_name: 'Samsung Philippines', created_at: new Date().toISOString() },
-  { item_id: 'g5', sku: 'SKU-IPH14-128', brand: 'Apple', model: 'iPhone 14', storage: '128GB', ram: '6GB', color: 'Midnight', cost_price: 650.00, retail_price: 799.00, current_branch: 'Cebu Outlet', status: 'Sold', imei_1: '358912345678909', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
-  { item_id: 'g6', sku: 'SKU-IPH15P-256', brand: 'Apple', model: 'iPhone 15 Pro', storage: '256GB', ram: '8GB', color: 'Black Titanium', cost_price: 950.00, retail_price: 1199.00, current_branch: 'Manila HQ', status: 'In Transit', imei_1: '358912345678910', imei_2: '358912345678911', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
-  { item_id: 'g7', sku: 'SKU-SAM-A55-128', brand: 'Samsung', model: 'Galaxy A55 5G', storage: '128GB', ram: '8GB', color: 'Awesome Lilac', cost_price: 300.00, retail_price: 399.00, current_branch: 'Davao Hub', status: 'In Stock', imei_1: '358912345678912', imei_2: '358912345678913', supplier_name: 'Samsung Philippines', created_at: new Date().toISOString() },
+  { item_id: 'g1', sku: 'SKU-IPH15P-256', brand: 'Apple', model: 'iPhone 15 Pro', storage: '256GB', ram: '8GB', color: 'Natural Titanium', cost_price: 950.00, retail_price: 1199.00, current_branch: 'Branch A', status: 'In Stock', imei_1: '358912345678901', imei_2: '358912345678902', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
+  { item_id: 'g2', sku: 'SKU-IPH15P-256', brand: 'Apple', model: 'iPhone 15 Pro', storage: '256GB', ram: '8GB', color: 'Blue Titanium', cost_price: 950.00, retail_price: 1199.00, current_branch: 'Branch B', status: 'In Stock', imei_1: '358912345678903', imei_2: '358912345678904', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
+  { item_id: 'g3', sku: 'SKU-SAM-S24U-512', brand: 'Samsung', model: 'Galaxy S24 Ultra', storage: '512GB', ram: '12GB', color: 'Titanium Black', cost_price: 1100.00, retail_price: 1399.00, current_branch: 'Branch C', status: 'In Stock', imei_1: '358912345678905', imei_2: '358912345678906', supplier_name: 'Samsung Philippines', created_at: new Date().toISOString() },
+  { item_id: 'g4', sku: 'SKU-SAM-S24U-512', brand: 'Samsung', model: 'Galaxy S24 Ultra', storage: '512GB', ram: '12GB', color: 'Titanium Gray', cost_price: 1100.00, retail_price: 1399.00, current_branch: 'Branch A', status: 'Sold', imei_1: '358912345678907', imei_2: '358912345678908', supplier_name: 'Samsung Philippines', created_at: new Date().toISOString() },
+  { item_id: 'g5', sku: 'SKU-IPH14-128', brand: 'Apple', model: 'iPhone 14', storage: '128GB', ram: '6GB', color: 'Midnight', cost_price: 650.00, retail_price: 799.00, current_branch: 'Branch B', status: 'Sold', imei_1: '358912345678909', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
+  { item_id: 'g6', sku: 'SKU-IPH15P-256', brand: 'Apple', model: 'iPhone 15 Pro', storage: '256GB', ram: '8GB', color: 'Black Titanium', cost_price: 950.00, retail_price: 1199.00, current_branch: 'Branch A', status: 'In Transit', imei_1: '358912345678910', imei_2: '358912345678911', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
+  { item_id: 'g7', sku: 'SKU-SAM-A55-128', brand: 'Samsung', model: 'Galaxy A55 5G', storage: '128GB', ram: '8GB', color: 'Awesome Lilac', cost_price: 300.00, retail_price: 399.00, current_branch: 'Branch C', status: 'In Stock', imei_1: '358912345678912', imei_2: '358912345678913', supplier_name: 'Samsung Philippines', created_at: new Date().toISOString() },
 ];
 
 const mockParts: RepairPart[] = [
-  { part_id: 'p1', sku: 'PART-IPH15P-SCR', part_name: 'iPhone 15 Pro OLED Screen Replacement', compatible_models: ['iPhone 15 Pro'], branch_location: 'Manila HQ', stock_qty: 11, minimum_stock_threshold: 3, cost_price: 180.00, service_price: 299.00, created_at: new Date().toISOString() },
-  { part_id: 'p2', sku: 'PART-IPH15P-SCR', part_name: 'iPhone 15 Pro OLED Screen Replacement', compatible_models: ['iPhone 15 Pro'], branch_location: 'Cebu Outlet', stock_qty: 4, minimum_stock_threshold: 3, cost_price: 180.00, service_price: 299.00, created_at: new Date().toISOString() },
-  { part_id: 'p3', sku: 'PART-IPH15P-SCR', part_name: 'iPhone 15 Pro OLED Screen Replacement', compatible_models: ['iPhone 15 Pro'], branch_location: 'Davao Hub', stock_qty: 2, minimum_stock_threshold: 3, cost_price: 180.00, service_price: 299.00, created_at: new Date().toISOString() },
-  { part_id: 'p4', sku: 'PART-S24U-BATT', part_name: 'Samsung Galaxy S24 Ultra Battery 5000mAh', compatible_models: ['Galaxy S24 Ultra', 'SM-S928B'], branch_location: 'Manila HQ', stock_qty: 15, minimum_stock_threshold: 5, cost_price: 35.00, service_price: 75.00, created_at: new Date().toISOString() },
-  { part_id: 'p5', sku: 'PART-S24U-BATT', part_name: 'Samsung Galaxy S24 Ultra Battery 5000mAh', compatible_models: ['Galaxy S24 Ultra', 'SM-S928B'], branch_location: 'Cebu Outlet', stock_qty: 6, minimum_stock_threshold: 5, cost_price: 35.00, service_price: 75.00, created_at: new Date().toISOString() },
-  { part_id: 'p6', sku: 'PART-GEN-PORT', part_name: 'Universal Type-C Charging Port Board v3', compatible_models: ['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], branch_location: 'Manila HQ', stock_qty: 30, minimum_stock_threshold: 10, cost_price: 8.00, service_price: 25.00, created_at: new Date().toISOString() },
-  { part_id: 'p7', sku: 'PART-GEN-PORT', part_name: 'Universal Type-C Charging Port Board v3', compatible_models: ['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], branch_location: 'Davao Hub', stock_qty: 8, minimum_stock_threshold: 10, cost_price: 8.00, service_price: 25.00, created_at: new Date().toISOString() },
-  { part_id: 'p8', sku: 'ACC-SCR-PROT', part_name: '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', compatible_models: ['iPhone 15', 'iPhone 15 Pro'], branch_location: 'Manila HQ', stock_qty: 120, minimum_stock_threshold: 20, cost_price: 1.50, service_price: 10.00, created_at: new Date().toISOString() },
-  { part_id: 'p9', sku: 'ACC-SCR-PROT', part_name: '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', compatible_models: ['iPhone 15', 'iPhone 15 Pro'], branch_location: 'Cebu Outlet', stock_qty: 45, minimum_stock_threshold: 20, cost_price: 1.50, service_price: 10.00, created_at: new Date().toISOString() }
+  { part_id: 'p1', sku: 'PART-IPH15P-SCR', part_name: 'iPhone 15 Pro OLED Screen Replacement', compatible_models: ['iPhone 15 Pro'], branch_location: 'Branch A', stock_qty: 11, minimum_stock_threshold: 3, cost_price: 180.00, service_price: 299.00, created_at: new Date().toISOString() },
+  { part_id: 'p2', sku: 'PART-IPH15P-SCR', part_name: 'iPhone 15 Pro OLED Screen Replacement', compatible_models: ['iPhone 15 Pro'], branch_location: 'Branch B', stock_qty: 4, minimum_stock_threshold: 3, cost_price: 180.00, service_price: 299.00, created_at: new Date().toISOString() },
+  { part_id: 'p3', sku: 'PART-IPH15P-SCR', part_name: 'iPhone 15 Pro OLED Screen Replacement', compatible_models: ['iPhone 15 Pro'], branch_location: 'Branch C', stock_qty: 2, minimum_stock_threshold: 3, cost_price: 180.00, service_price: 299.00, created_at: new Date().toISOString() },
+  { part_id: 'p4', sku: 'PART-S24U-BATT', part_name: 'Samsung Galaxy S24 Ultra Battery 5000mAh', compatible_models: ['Galaxy S24 Ultra', 'SM-S928B'], branch_location: 'Branch A', stock_qty: 15, minimum_stock_threshold: 5, cost_price: 35.00, service_price: 75.00, created_at: new Date().toISOString() },
+  { part_id: 'p5', sku: 'PART-S24U-BATT', part_name: 'Samsung Galaxy S24 Ultra Battery 5000mAh', compatible_models: ['Galaxy S24 Ultra', 'SM-S928B'], branch_location: 'Branch B', stock_qty: 6, minimum_stock_threshold: 5, cost_price: 35.00, service_price: 75.00, created_at: new Date().toISOString() },
+  { part_id: 'p6', sku: 'PART-GEN-PORT', part_name: 'Universal Type-C Charging Port Board v3', compatible_models: ['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], branch_location: 'Branch A', stock_qty: 30, minimum_stock_threshold: 10, cost_price: 8.00, service_price: 25.00, created_at: new Date().toISOString() },
+  { part_id: 'p7', sku: 'PART-GEN-PORT', part_name: 'Universal Type-C Charging Port Board v3', compatible_models: ['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], branch_location: 'Branch C', stock_qty: 8, minimum_stock_threshold: 10, cost_price: 8.00, service_price: 25.00, created_at: new Date().toISOString() },
+  { part_id: 'p8', sku: 'ACC-SCR-PROT', part_name: '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', compatible_models: ['iPhone 15', 'iPhone 15 Pro'], branch_location: 'Branch A', stock_qty: 120, minimum_stock_threshold: 20, cost_price: 1.50, service_price: 10.00, created_at: new Date().toISOString() },
+  { part_id: 'p9', sku: 'ACC-SCR-PROT', part_name: '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', compatible_models: ['iPhone 15', 'iPhone 15 Pro'], branch_location: 'Branch B', stock_qty: 45, minimum_stock_threshold: 20, cost_price: 1.50, service_price: 10.00, created_at: new Date().toISOString() }
 ];
 
 const mockTickets: ServiceTicket[] = [
-  { ticket_id: 't1', customer_name: 'John Doe', phone_number: '+639171234567', device_model: 'iPhone 15 Pro', imei_serial: '358912345678901', issue_description: 'Shattered screen from dropping. Screen completely black.', assigned_technician: 'Alex Cruz', ticket_status: 'Repairing', labor_cost: 50.00, total_amount: 349.00, branch_location: 'Manila HQ', created_at: new Date(Date.now() - 86400000).toISOString(), updated_at: new Date().toISOString() },
-  { ticket_id: 't2', customer_name: 'Maria Santos', phone_number: '+639189876543', device_model: 'Galaxy S24 Ultra', imei_serial: '358912345678905', issue_description: 'Battery draining rapidly, device gets hot while charging.', assigned_technician: 'Benjie Diaz', ticket_status: 'Pending', labor_cost: 30.00, total_amount: 30.00, branch_location: 'Cebu Outlet', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { ticket_id: 't3', customer_name: 'Gabriel Reyes', phone_number: '+639205554433', device_model: 'iPhone 14', imei_serial: '358912345678909', issue_description: 'Clean speaker grills and check charging port connection.', assigned_technician: undefined, ticket_status: 'Diagnosing', labor_cost: 15.00, total_amount: 15.00, branch_location: 'Manila HQ', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { ticket_id: 't4', customer_name: 'Sarah Lee', phone_number: '+639998887766', device_model: 'Xiaomi 13 Pro', imei_serial: '864239857392812', issue_description: 'Replace cracked back glass panel.', assigned_technician: 'Alex Cruz', ticket_status: 'Completed', labor_cost: 40.00, total_amount: 40.00, branch_location: 'Manila HQ', created_at: new Date(Date.now() - 172800000).toISOString(), updated_at: new Date().toISOString() }
+  { ticket_id: 't1', customer_name: 'John Doe', phone_number: '+639171234567', device_model: 'iPhone 15 Pro', imei_serial: '358912345678901', issue_description: 'Shattered screen from dropping. Screen completely black.', assigned_technician: 'Alex Cruz', ticket_status: 'Repairing', labor_cost: 50.00, total_amount: 349.00, branch_location: 'Branch A', created_at: new Date(Date.now() - 86400000).toISOString(), updated_at: new Date().toISOString() },
+  { ticket_id: 't2', customer_name: 'Maria Santos', phone_number: '+639189876543', device_model: 'Galaxy S24 Ultra', imei_serial: '358912345678905', issue_description: 'Battery draining rapidly, device gets hot while charging.', assigned_technician: 'Benjie Diaz', ticket_status: 'Pending', labor_cost: 30.00, total_amount: 30.00, branch_location: 'Branch B', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { ticket_id: 't3', customer_name: 'Gabriel Reyes', phone_number: '+639205554433', device_model: 'iPhone 14', imei_serial: '358912345678909', issue_description: 'Clean speaker grills and check charging port connection.', assigned_technician: undefined, ticket_status: 'Diagnosing', labor_cost: 15.00, total_amount: 15.00, branch_location: 'Branch A', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { ticket_id: 't4', customer_name: 'Sarah Lee', phone_number: '+639998887766', device_model: 'Xiaomi 13 Pro', imei_serial: '864239857392812', issue_description: 'Replace cracked back glass panel.', assigned_technician: 'Alex Cruz', ticket_status: 'Completed', labor_cost: 40.00, total_amount: 40.00, branch_location: 'Branch A', created_at: new Date(Date.now() - 172800000).toISOString(), updated_at: new Date().toISOString() }
 ];
 
 const mockTransfers: BranchTransfer[] = [
-  { transfer_id: 'tr1', source_branch: 'Manila HQ', destination_branch: 'Cebu Outlet', item_type: 'Serialized', reference_identifier: '358912345678910', quantity: 1, dispatcher: 'Mark Manager', receiver: undefined, transfer_status: 'In Transit', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { transfer_id: 'tr2', source_branch: 'Manila HQ', destination_branch: 'Davao Hub', item_type: 'Bulk', reference_identifier: 'PART-GEN-PORT', quantity: 5, dispatcher: 'Mark Manager', receiver: 'Rene Technician', transfer_status: 'Received', created_at: new Date(Date.now() - 86400000).toISOString(), updated_at: new Date().toISOString() }
+  { transfer_id: 'tr1', source_branch: 'Branch A', destination_branch: 'Branch B', item_type: 'Serialized', reference_identifier: '358912345678910', quantity: 1, dispatcher: 'Mark Manager', receiver: undefined, transfer_status: 'In Transit', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { transfer_id: 'tr2', source_branch: 'Branch A', destination_branch: 'Branch C', item_type: 'Bulk', reference_identifier: 'PART-GEN-PORT', quantity: 5, dispatcher: 'Mark Manager', receiver: 'Rene Technician', transfer_status: 'Received', created_at: new Date(Date.now() - 86400000).toISOString(), updated_at: new Date().toISOString() }
 ];
 
 const mockTicketParts: TicketPartsUsed[] = [
@@ -167,15 +167,15 @@ export default function Dashboard() {
 
   // Dispatch Transfer Modal / Form State
   const [showTransferModal, setShowTransferModal] = useState<boolean>(false);
-  const [transferSource, setTransferSource] = useState<BranchLocation>('Manila HQ');
-  const [transferDest, setTransferDest] = useState<BranchLocation>('Cebu Outlet');
+  const [transferSource, setTransferSource] = useState<BranchLocation>('Branch A');
+  const [transferDest, setTransferDest] = useState<BranchLocation>('Branch B');
   const [transferItemType, setTransferItemType] = useState<'Serialized' | 'Bulk'>('Serialized');
   const [transferRefId, setTransferRefId] = useState<string>(''); // IMEI or SKU
   const [transferQty, setTransferQty] = useState<number>(1);
   const [transferDispatcher, setTransferDispatcher] = useState<string>('Manager Counter');
 
   // Sales / Stock-Out Form States
-  const [saleBranch, setSaleBranch] = useState<BranchLocation>('Manila HQ');
+  const [saleBranch, setSaleBranch] = useState<BranchLocation>('Branch A');
   const [saleImei, setSaleImei] = useState<string>('');
   const [salePartSku, setSalePartSku] = useState<string>('');
   const [salePartQty, setSalePartQty] = useState<number>(1);
@@ -636,9 +636,9 @@ export default function Dashboard() {
               style={{ paddingRight: '30px', cursor: 'pointer', appearance: 'none', background: 'rgba(255,255,255,0.04)' }}
             >
               <option value="All Branches">All Branches (Global)</option>
-              <option value="Manila HQ">Manila HQ</option>
-              <option value="Cebu Outlet">Cebu Outlet</option>
-              <option value="Davao Hub">Davao Hub</option>
+              <option value="Branch A">Branch A</option>
+              <option value="Branch B">Branch B</option>
+              <option value="Branch C">Branch C</option>
             </select>
             <div style={{ position: 'absolute', right: '12px', top: '13px', pointerEvents: 'none', width: '0', height: '0', borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--text-muted)' }}></div>
           </div>
@@ -924,9 +924,9 @@ export default function Dashboard() {
                     onChange={(e) => setSaleBranch(e.target.value as BranchLocation)}
                     className="form-input"
                   >
-                    <option value="Manila HQ">Manila HQ</option>
-                    <option value="Cebu Outlet">Cebu Outlet</option>
-                    <option value="Davao Hub">Davao Hub</option>
+                    <option value="Branch A">Branch A</option>
+                    <option value="Branch B">Branch B</option>
+                    <option value="Branch C">Branch C</option>
                   </select>
                 </div>
 
@@ -1210,7 +1210,7 @@ export default function Dashboard() {
         {activeTab === 'analytics' && (
           <div className="glass-panel" style={{ padding: '24px' }}>
             <h2>Daily Revenue &amp; Store Performance Report</h2>
-            <p style={{ marginBottom: '24px' }}>Aggregated accounting data for Manila HQ, Cebu Outlet, and Davao Hub branches.</p>
+            <p style={{ marginBottom: '24px' }}>Aggregated accounting data for Branch A, Branch B, and Branch C branches.</p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
               
@@ -1218,7 +1218,7 @@ export default function Dashboard() {
               <div style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '16px', color: 'var(--color-primary)' }}>Sales Distribution by Branch</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {['Manila HQ', 'Cebu Outlet', 'Davao Hub'].map((branch) => {
+                  {['Branch A', 'Branch B', 'Branch C'].map((branch) => {
                     // Calculate branch revenue
                     const ticketRev = tickets.filter(t => t.branch_location === branch && t.ticket_status === 'Completed').reduce((sum, t) => sum + Number(t.total_amount), 0);
                     const deviceRev = gadgets.filter(g => g.current_branch === branch && g.status === 'Sold').reduce((sum, g) => sum + Number(g.retail_price), 0);
@@ -1352,9 +1352,9 @@ export default function Dashboard() {
                     onChange={(e) => setTransferSource(e.target.value as BranchLocation)}
                     className="form-input"
                   >
-                    <option value="Manila HQ">Manila HQ</option>
-                    <option value="Cebu Outlet">Cebu Outlet</option>
-                    <option value="Davao Hub">Davao Hub</option>
+                    <option value="Branch A">Branch A</option>
+                    <option value="Branch B">Branch B</option>
+                    <option value="Branch C">Branch C</option>
                   </select>
                 </div>
                 <div>
@@ -1364,9 +1364,9 @@ export default function Dashboard() {
                     onChange={(e) => setTransferDest(e.target.value as BranchLocation)}
                     className="form-input"
                   >
-                    <option value="Cebu Outlet">Cebu Outlet</option>
-                    <option value="Manila HQ">Manila HQ</option>
-                    <option value="Davao Hub">Davao Hub</option>
+                    <option value="Branch B">Branch B</option>
+                    <option value="Branch A">Branch A</option>
+                    <option value="Branch C">Branch C</option>
                   </select>
                 </div>
               </div>

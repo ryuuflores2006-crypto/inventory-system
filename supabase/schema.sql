@@ -1,5 +1,5 @@
 -- Supabase SQL Schema for Centralized Multi-Branch Inventory System
--- Branches: 'Manila HQ', 'Cebu Outlet', 'Davao Hub'
+-- Branches: 'Branch A', 'Branch B', 'Branch C'
 
 -- Drop existing tables if they exist to allow clean migrations
 DROP TABLE IF EXISTS branch_transfers CASCADE;
@@ -14,7 +14,7 @@ DROP TYPE IF EXISTS ticket_status_type CASCADE;
 DROP TYPE IF EXISTS transfer_status_type CASCADE;
 
 -- Enums
-CREATE TYPE branch_location_type AS ENUM ('Manila HQ', 'Cebu Outlet', 'Davao Hub');
+CREATE TYPE branch_location_type AS ENUM ('Branch A', 'Branch B', 'Branch C');
 CREATE TYPE gadget_status_type AS ENUM ('In Stock', 'Reserved', 'Sold', 'In Transit', 'Returned');
 CREATE TYPE ticket_status_type AS ENUM ('Pending', 'Diagnosing', 'Waiting for Parts', 'Repairing', 'Ready', 'Completed');
 CREATE TYPE transfer_status_type AS ENUM ('In Transit', 'Received', 'Cancelled');
@@ -188,49 +188,43 @@ FOR EACH ROW EXECUTE FUNCTION update_ticket_total_amount();
 
 -- 1. Seed Serialized Devices
 INSERT INTO retail_gadgets (sku, brand, model, storage, ram, color, cost_price, retail_price, current_branch, status, imei_1, imei_2, supplier_name) VALUES
-('SKU-IPH15P-256', 'Apple', 'iPhone 15 Pro', '256GB', '8GB', 'Natural Titanium', 950.00, 1199.00, 'Manila HQ', 'In Stock', '358912345678901', '358912345678902', 'Apple Distribution Asia'),
-('SKU-IPH15P-256', 'Apple', 'iPhone 15 Pro', '256GB', '8GB', 'Blue Titanium', 950.00, 1199.00, 'Cebu Outlet', 'In Stock', '358912345678903', '358912345678904', 'Apple Distribution Asia'),
-('SKU-SAM-S24U-512', 'Samsung', 'Galaxy S24 Ultra', '512GB', '12GB', 'Titanium Black', 1100.00, 1399.00, 'Davao Hub', 'In Stock', '358912345678905', '358912345678906', 'Samsung Philippines'),
-('SKU-SAM-S24U-512', 'Samsung', 'Galaxy S24 Ultra', '512GB', '12GB', 'Titanium Gray', 1100.00, 1399.00, 'Manila HQ', 'Sold', '358912345678907', '358912345678908', 'Samsung Philippines'),
-('SKU-IPH14-128', 'Apple', 'iPhone 14', '128GB', '6GB', 'Midnight', 650.00, 799.00, 'Cebu Outlet', 'Sold', '358912345678909', NULL, 'Apple Distribution Asia'),
-('SKU-IPH15P-256', 'Apple', 'iPhone 15 Pro', '256GB', '8GB', 'Black Titanium', 950.00, 1199.00, 'Manila HQ', 'In Transit', '358912345678910', '358912345678911', 'Apple Distribution Asia'),
-('SKU-SAM-A55-128', 'Samsung', 'Galaxy A55 5G', '128GB', '8GB', 'Awesome Lilac', 300.00, 399.00, 'Davao Hub', 'In Stock', '358912345678912', '358912345678913', 'Samsung Philippines');
+('SKU-IPH15P-256', 'Apple', 'iPhone 15 Pro', '256GB', '8GB', 'Natural Titanium', 950.00, 1199.00, 'Branch A', 'In Stock', '358912345678901', '358912345678902', 'Apple Distribution Asia'),
+('SKU-IPH15P-256', 'Apple', 'iPhone 15 Pro', '256GB', '8GB', 'Blue Titanium', 950.00, 1199.00, 'Branch B', 'In Stock', '358912345678903', '358912345678904', 'Apple Distribution Asia'),
+('SKU-SAM-S24U-512', 'Samsung', 'Galaxy S24 Ultra', '512GB', '12GB', 'Titanium Black', 1100.00, 1399.00, 'Branch C', 'In Stock', '358912345678905', '358912345678906', 'Samsung Philippines'),
+('SKU-SAM-S24U-512', 'Samsung', 'Galaxy S24 Ultra', '512GB', '12GB', 'Titanium Gray', 1100.00, 1399.00, 'Branch A', 'Sold', '358912345678907', '358912345678908', 'Samsung Philippines'),
+('SKU-IPH14-128', 'Apple', 'iPhone 14', '128GB', '6GB', 'Midnight', 650.00, 799.00, 'Branch B', 'Sold', '358912345678909', NULL, 'Apple Distribution Asia'),
+('SKU-IPH15P-256', 'Apple', 'iPhone 15 Pro', '256GB', '8GB', 'Black Titanium', 950.00, 1199.00, 'Branch A', 'In Transit', '358912345678910', '358912345678911', 'Apple Distribution Asia'),
+('SKU-SAM-A55-128', 'Samsung', 'Galaxy A55 5G', '128GB', '8GB', 'Awesome Lilac', 300.00, 399.00, 'Branch C', 'In Stock', '358912345678912', '358912345678913', 'Samsung Philippines');
 
 -- 2. Seed Repair Parts
 INSERT INTO repair_parts (sku, part_name, compatible_models, branch_location, stock_qty, minimum_stock_threshold, cost_price, service_price) VALUES
-('PART-IPH15P-SCR', 'iPhone 15 Pro OLED Screen Replacement', ARRAY['iPhone 15 Pro'], 'Manila HQ', 12, 3, 180.00, 299.00),
-('PART-IPH15P-SCR', 'iPhone 15 Pro OLED Screen Replacement', ARRAY['iPhone 15 Pro'], 'Cebu Outlet', 4, 3, 180.00, 299.00),
-('PART-IPH15P-SCR', 'iPhone 15 Pro OLED Screen Replacement', ARRAY['iPhone 15 Pro'], 'Davao Hub', 2, 3, 180.00, 299.00),
-('PART-S24U-BATT', 'Samsung Galaxy S24 Ultra Battery 5000mAh', ARRAY['Galaxy S24 Ultra', 'SM-S928B'], 'Manila HQ', 15, 5, 35.00, 75.00),
-('PART-S24U-BATT', 'Samsung Galaxy S24 Ultra Battery 5000mAh', ARRAY['Galaxy S24 Ultra', 'SM-S928B'], 'Cebu Outlet', 6, 5, 35.00, 75.00),
-('PART-GEN-PORT', 'Universal Type-C Charging Port Board v3', ARRAY['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], 'Manila HQ', 30, 10, 8.00, 25.00),
-('PART-GEN-PORT', 'Universal Type-C Charging Port Board v3', ARRAY['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], 'Davao Hub', 8, 10, 8.00, 25.00),
-('ACC-SCR-PROT', '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', ARRAY['iPhone 15', 'iPhone 15 Pro'], 'Manila HQ', 120, 20, 1.50, 10.00),
-('ACC-SCR-PROT', '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', ARRAY['iPhone 15', 'iPhone 15 Pro'], 'Cebu Outlet', 45, 20, 1.50, 10.00);
+('PART-IPH15P-SCR', 'iPhone 15 Pro OLED Screen Replacement', ARRAY['iPhone 15 Pro'], 'Branch A', 12, 3, 180.00, 299.00),
+('PART-IPH15P-SCR', 'iPhone 15 Pro OLED Screen Replacement', ARRAY['iPhone 15 Pro'], 'Branch B', 4, 3, 180.00, 299.00),
+('PART-IPH15P-SCR', 'iPhone 15 Pro OLED Screen Replacement', ARRAY['iPhone 15 Pro'], 'Branch C', 2, 3, 180.00, 299.00),
+('PART-S24U-BATT', 'Samsung Galaxy S24 Ultra Battery 5000mAh', ARRAY['Galaxy S24 Ultra', 'SM-S928B'], 'Branch A', 15, 5, 35.00, 75.00),
+('PART-S24U-BATT', 'Samsung Galaxy S24 Ultra Battery 5000mAh', ARRAY['Galaxy S24 Ultra', 'SM-S928B'], 'Branch B', 6, 5, 35.00, 75.00),
+('PART-GEN-PORT', 'Universal Type-C Charging Port Board v3', ARRAY['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], 'Branch A', 30, 10, 8.00, 25.00),
+('PART-GEN-PORT', 'Universal Type-C Charging Port Board v3', ARRAY['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], 'Branch C', 8, 10, 8.00, 25.00),
+('ACC-SCR-PROT', '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', ARRAY['iPhone 15', 'iPhone 15 Pro'], 'Branch A', 120, 20, 1.50, 10.00),
+('ACC-SCR-PROT', '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', ARRAY['iPhone 15', 'iPhone 15 Pro'], 'Branch B', 45, 20, 1.50, 10.00);
 
 -- 3. Seed Service Tickets
 INSERT INTO service_tickets (customer_name, phone_number, device_model, imei_serial, issue_description, assigned_technician, ticket_status, labor_cost, branch_location) VALUES
-('John Doe', '+639171234567', 'iPhone 15 Pro', '358912345678901', 'Shattered screen from dropping. Screen completely black.', 'Alex Cruz', 'Repairing', 50.00, 'Manila HQ'),
-('Maria Santos', '+639189876543', 'Galaxy S24 Ultra', '358912345678905', 'Battery draining rapidly, device gets hot while charging.', 'Benjie Diaz', 'Pending', 30.00, 'Cebu Outlet'),
-('Gabriel Reyes', '+639205554433', 'iPhone 14', '358912345678909', 'Clean speaker grills and check charging port connection.', NULL, 'Diagnosing', 15.00, 'Manila HQ'),
-('Sarah Lee', '+639998887766', 'Xiaomi 13 Pro', '864239857392812', 'Replace cracked back glass panel.', 'Alex Cruz', 'Completed', 40.00, 'Manila HQ');
+('John Doe', '+639171234567', 'iPhone 15 Pro', '358912345678901', 'Shattered screen from dropping. Screen completely black.', 'Alex Cruz', 'Repairing', 50.00, 'Branch A'),
+('Maria Santos', '+639189876543', 'Galaxy S24 Ultra', '358912345678905', 'Battery draining rapidly, device gets hot while charging.', 'Benjie Diaz', 'Pending', 30.00, 'Branch B'),
+('Gabriel Reyes', '+639205554433', 'iPhone 14', '358912345678909', 'Clean speaker grills and check charging port connection.', NULL, 'Diagnosing', 15.00, 'Branch A'),
+('Sarah Lee', '+639998887766', 'Xiaomi 13 Pro', '864239857392812', 'Replace cracked back glass panel.', 'Alex Cruz', 'Completed', 40.00, 'Branch A');
 
 -- 4. Seed Parts Used for Service Tickets
--- For John Doe's repair ticket, link the iPhone 15 Pro Screen from Manila HQ
--- John Doe's ticket will be Manila HQ, so we get the Manila HQ Screen part_id.
--- We do this programmatically or using subqueries in this seed script.
 INSERT INTO ticket_parts_used (ticket_id, part_id, quantity_used, price_charged) VALUES
 (
     (SELECT ticket_id FROM service_tickets WHERE customer_name = 'John Doe' LIMIT 1),
-    (SELECT part_id FROM repair_parts WHERE sku = 'PART-IPH15P-SCR' AND branch_location = 'Manila HQ' LIMIT 1),
+    (SELECT part_id FROM repair_parts WHERE sku = 'PART-IPH15P-SCR' AND branch_location = 'Branch A' LIMIT 1),
     1,
     299.00
 );
 
--- Note: The trigger automatically decrements stock of 'PART-IPH15P-SCR' at Manila HQ (was 12, now 11),
--- and sets total_amount of John Doe's ticket to labor_cost (50.00) + part cost (299.00) = 349.00.
-
 -- 5. Seed Branch Transfers
 INSERT INTO branch_transfers (source_branch, destination_branch, item_type, reference_identifier, quantity, dispatcher, receiver, transfer_status) VALUES
-('Manila HQ', 'Cebu Outlet', 'Serialized', '358912345678910', 1, 'Mark Manager', NULL, 'In Transit'),
-('Manila HQ', 'Davao Hub', 'Bulk', 'PART-GEN-PORT', 5, 'Mark Manager', 'Rene Technician', 'Received');
+('Branch A', 'Branch B', 'Serialized', '358912345678910', 1, 'Mark Manager', NULL, 'In Transit'),
+('Branch A', 'Branch C', 'Bulk', 'PART-GEN-PORT', 5, 'Mark Manager', 'Rene Technician', 'Received');

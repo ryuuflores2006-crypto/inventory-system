@@ -85,7 +85,7 @@ fun InventoryListScreen() {
                     expanded = dropdownExpanded,
                     onDismissRequest = { dropdownExpanded = false }
                 ) {
-                    listOf("All Branches", "Manila HQ", "Cebu Outlet", "Davao Hub").forEach { loc ->
+                    listOf("All Branches", "Branch A", "Branch B", "Branch C").forEach { loc ->
                         DropdownMenuItem(
                             text = { Text(loc) },
                             onClick = {
