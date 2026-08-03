@@ -44,7 +44,7 @@ fun RepairTicketScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     ) {
         Text(
             text = "Repair Service Intake",
-            fontSize = 24_sp,
+            fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(bottom = 16.dp)

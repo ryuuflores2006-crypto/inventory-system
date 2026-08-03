@@ -61,7 +61,7 @@ fun InventoryListScreen() {
         Text(
             text = "Branch Inventory",
             color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 24_sp,
+            fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 12.dp)
         )

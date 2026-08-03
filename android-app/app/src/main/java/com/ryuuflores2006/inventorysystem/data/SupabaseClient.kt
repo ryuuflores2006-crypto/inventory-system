@@ -5,8 +5,8 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.gotrue.GoTrue
-import io.github.jan.supabase.gotrue.gotrue
+import io.github.jan.supabase.gotrue.Auth
+import io.github.jan.supabase.gotrue.auth
 import io.ktor.client.plugins.cookies.AcceptAllCookiesStorage
 import io.ktor.client.plugins.cookies.HttpCookies
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +26,7 @@ object SupabaseHelper {
                 supabaseKey = SUPABASE_ANON_KEY
             ) {
                 install(Postgrest)
-                install(GoTrue)
+                install(Auth) {}
             }
         }
     }
@@ -37,10 +37,10 @@ object SupabaseHelper {
             return client!!.postgrest
         }
 
-    val auth: GoTrue
+    val auth: Auth
         get() {
             if (client == null) init()
-            return client!!.gotrue
+            return client!!.auth
         }
 
     // --- Gadgets Service ---

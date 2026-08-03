@@ -58,7 +58,7 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     ) {
         Text(
             text = "Delivery Stock-In Log",
-            fontSize = 24_sp,
+            fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(bottom = 16.dp)
@@ -100,9 +100,7 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isSerialized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
-                ) {
-                    // Fallback block if needed
-                }
+                )
             ) {
                 Text(
                     "Serialized (Phone)",
@@ -115,9 +113,7 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (!isSerialized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
-                ) {
-                    // Fallback block
-                }
+                )
             ) {
                 Text(
                     "Bulk Parts/Accs",
