@@ -54,13 +54,13 @@ The backend schema features automated constraints, optimized indexing, and trigg
 *Built with Kotlin, Jetpack Compose, CameraX, and Google ML Kit.*
 * **Intended Users:** On-the-floor retail assistants and diagnostic technicians.
 * **Camera scanner:** Direct hardware camera binding to scan barcodes and 15-digit IMEIs in real-time.
-* **Stock-In receipts:** Quick input interfaces for receiving supplier shipments at the branch level.
+* **Stock-In receipts:** Quick input interfaces for receiving supplier shipments at the branch level, featuring standardized dropdown selections for Storage, RAM, and Suppliers to minimize manual typing.
 * **Ticket creation:** Rapid repair intakes for customer walk-ins.
 
 ### 2. Next.js Web Dashboard (`/web-dashboard`)
 *Built with Next.js, React, TypeScript, and CSS Modules.*
 * **Intended Users:** Store managers, inventory auditors, and front-desk cashiers.
-* **Master Audits:** Searchable, branch-filtered tables showcasing real-time stock balances and low-stock warning limits.
+* **Master Audits:** Searchable, branch-filtered tables showcasing real-time stock balances and low-stock warning limits, complete with a 1-click **Export to CSV/Spreadsheet** feature for printable inventory reports.
 * **Retail Cashier:** Interface to check out units. Scans cellphones out by changing status to `Sold` or decrements accessory quantity balances, generating receipts.
 * **Service Board:** Interactive technician board to track repair diagnostics, change status, and allocate repair parts.
 * **Logistics hub:** Form to dispatch branch-to-branch transfers. Shows transit statuses and handles receiving approvals to automatically update inventory location balances.
@@ -91,3 +91,12 @@ Execute the SQL DDL commands located in [supabase/schema.sql](file:///D:/Documen
 1. Open the `/android-app` folder inside Android Studio.
 2. Update connection configurations in `com.ryuuflores2006.inventorysystem.data.SupabaseHelper.kt` with your project URL and keys.
 3. Sync Gradle and hit **Run** to launch the application on an emulator or physical testing device.
+
+### Deploying the Web Dashboard to Vercel
+Since this project uses Supabase, deploying to Vercel is seamless:
+1. Go to your [Vercel Dashboard](https://vercel.com/) and click **Add New** -> **Project**.
+2. Import this GitHub repository.
+3. **IMPORTANT:** Under **Root Directory**, click edit and select `web-dashboard`.
+4. Vercel will prompt you to configure Environment Variables. Alternatively, if you have the **Supabase Vercel Integration** enabled, it can automatically sync your `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+5. Click **Deploy**. Vercel will build the web application and assign it a live URL (e.g., `https://your-project-name.vercel.app`).
+6. From then on, any commits pushed to the `main` branch on GitHub will be automatically deployed by Vercel.
