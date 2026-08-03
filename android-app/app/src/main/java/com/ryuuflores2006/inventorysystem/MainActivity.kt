@@ -18,6 +18,8 @@ import com.ryuuflores2006.inventorysystem.ui.screens.BarcodeScanScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.InventoryListScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.RepairTicketScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.StockInScreen
+import com.ryuuflores2006.inventorysystem.ui.screens.LoginScreen
+import com.ryuuflores2006.inventorysystem.ui.screens.RegisterScreen
 import com.ryuuflores2006.inventorysystem.ui.theme.InventorySystemTheme
 
 class MainActivity : ComponentActivity() {
@@ -33,9 +35,34 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainScreenContainer()
+                    MainApp()
                 }
             }
+        }
+    }
+}
+
+enum class Screen { LOGIN, REGISTER, MAIN }
+
+@Composable
+fun MainApp() {
+    var currentScreen by remember { mutableStateOf(Screen.LOGIN) }
+    
+    when (currentScreen) {
+        Screen.LOGIN -> {
+            LoginScreen(
+                onLoginSuccess = { currentScreen = Screen.MAIN },
+                onNavigateToRegister = { currentScreen = Screen.REGISTER }
+            )
+        }
+        Screen.REGISTER -> {
+            RegisterScreen(
+                onRegisterSuccess = { currentScreen = Screen.MAIN },
+                onNavigateToLogin = { currentScreen = Screen.LOGIN }
+            )
+        }
+        Screen.MAIN -> {
+            MainScreenContainer()
         }
     }
 }
