@@ -145,16 +145,18 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                OutlinedTextField(
+                DropdownField(
                     value = storage,
                     onValueChange = { storage = it },
-                    label = { Text("Storage (e.g. 256GB)") },
+                    label = "Storage",
+                    options = listOf("64GB", "128GB", "256GB", "512GB", "1TB"),
                     modifier = Modifier.weight(1f).padding(end = 4.dp)
                 )
-                OutlinedTextField(
+                DropdownField(
                     value = ram,
                     onValueChange = { ram = it },
-                    label = { Text("RAM (e.g. 8GB)") },
+                    label = "RAM",
+                    options = listOf("4GB", "6GB", "8GB", "12GB", "16GB"),
                     modifier = Modifier.weight(1f).padding(start = 4.dp)
                 )
             }
@@ -205,10 +207,11 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 label = { Text("IMEI 2 (Optional)") },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
-            OutlinedTextField(
+            DropdownField(
                 value = supplierName,
                 onValueChange = { supplierName = it },
-                label = { Text("Supplier Name") },
+                label = "Supplier Name",
+                options = listOf("Apple Distribution Asia", "Samsung Philippines", "Xiaomi Official", "Local Supplier"),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
         } else {
@@ -345,6 +348,46 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
             } else {
                 Text("Confirm Stock-In Receipt", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DropdownField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    options: List<String>,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.menuAnchor()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { selectionOption ->
+                DropdownMenuItem(
+                    text = { Text(selectionOption) },
+                    onClick = {
+                        onValueChange(selectionOption)
+                        expanded = false
+                    }
+                )
             }
         }
     }

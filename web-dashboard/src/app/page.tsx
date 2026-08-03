@@ -157,6 +157,29 @@ export default function Dashboard() {
   // Sub-navigation within Inventory
   const [inventorySubTab, setInventorySubTab] = useState<'serialized' | 'bulk'>('serialized');
 
+  const exportToCSV = (data: any[], filename: string) => {
+    if (data.length === 0) {
+      alert('No data to export.');
+      return;
+    }
+    const headers = Object.keys(data[0]).join(',');
+    const csvRows = data.map(row => 
+      Object.values(row).map(value => 
+        typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value
+      ).join(',')
+    );
+    const csvContent = [headers, ...csvRows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
   // Modals / Workflows States
   const [showAllocatePartModal, setShowAllocatePartModal] = useState<boolean>(false);
   const [selectedTicketForPart, setSelectedTicketForPart] = useState<ServiceTicket | null>(null);
@@ -777,18 +800,33 @@ export default function Dashboard() {
         {/* TAB CONTENT: INVENTORY AUDIT */}
         {activeTab === 'inventory' && (
           <div className="glass-panel" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button 
+                  className={`btn ${inventorySubTab === 'serialized' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setInventorySubTab('serialized')}
+                >
+                  Serialized Phones / Tablets
+                </button>
+                <button 
+                  className={`btn ${inventorySubTab === 'bulk' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setInventorySubTab('bulk')}
+                >
+                  Accessories &amp; Spare Components
+                </button>
+              </div>
               <button 
-                className={`btn ${inventorySubTab === 'serialized' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setInventorySubTab('serialized')}
+                className="btn btn-outline"
+                onClick={() => {
+                  if (inventorySubTab === 'serialized') {
+                    exportToCSV(gadgets, 'serialized_stock_report.csv');
+                  } else {
+                    exportToCSV(parts, 'bulk_parts_stock_report.csv');
+                  }
+                }}
               >
-                Serialized Phones / Tablets
-              </button>
-              <button 
-                className={`btn ${inventorySubTab === 'bulk' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setInventorySubTab('bulk')}
-              >
-                Accessories &amp; Spare Components
+                <FileText size={16} style={{ marginRight: '8px' }} />
+                Export / Print CSV
               </button>
             </div>
 
