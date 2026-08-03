@@ -16,8 +16,8 @@ object SupabaseHelper {
     private var client: SupabaseClient? = null
 
     // Replace with actual Supabase details
-    private const val SUPABASE_URL = "https://your-project.supabase.co"
-    private const val SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.your-key-here"
+    private const val SUPABASE_URL = "https://omecmeysesqwaxbbtebb.supabase.co"
+    private const val SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tZWNtZXlzZXNxd2F4YmJ0ZWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NDQzMDUsImV4cCI6MjEwMTMyMDMwNX0.7Bcdjxxrm8TkrOgo33Sd8P4y8yyztpRb1H3K7keWorQ"
 
     fun init() {
         if (client == null) {
