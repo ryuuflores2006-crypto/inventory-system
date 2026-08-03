@@ -1,0 +1,28 @@
+# Next.js Ignore
+web-dashboard/node_modules/
+web-dashboard/.next/
+web-dashboard/out/
+web-dashboard/.env.local
+web-dashboard/.env.development.local
+web-dashboard/.env.test.local
+web-dashboard/.env.production.local
+
+# Android Ignore
+android-app/.gradle/
+android-app/local.properties
+android-app/app/build/
+android-app/build/
+android-app/.idea/
+android-app/*.iml
+android-app/.cxx/
+android-app/captures/
+
+# Logs and databases
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# System Files
+.DS_Store
+Thumbs.db
