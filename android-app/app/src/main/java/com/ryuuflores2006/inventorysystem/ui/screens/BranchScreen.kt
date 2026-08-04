@@ -1,42 +1,47 @@
 package com.ryuuflores2006.inventorysystem.ui.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ryuuflores2006.inventorysystem.data.Branch
 import com.ryuuflores2006.inventorysystem.data.BranchStore
+import com.ryuuflores2006.inventorysystem.data.LiveStore
+import com.ryuuflores2006.inventorysystem.ui.components.*
+import com.ryuuflores2006.inventorysystem.ui.theme.*
 import kotlinx.coroutines.launch
 
 /**
- * Add and manage stores from the phone. The same list drives the PC dashboard.
+ * Add and manage stores from the phone. The same list drives every dropdown
+ * here and the PC dashboard.
  */
 @Composable
 fun BranchScreen() {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
     var showAddDialog by remember { mutableStateOf(false) }
     var pendingArchive by remember { mutableStateOf<Branch?>(null) }
 
     LaunchedEffect(Unit) { BranchStore.refresh() }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAddDialog = true },
+                containerColor = Cyan,
+                contentColor = Ink900,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("Add branch") }
             )
@@ -45,36 +50,32 @@ fun BranchScreen() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
-                .padding(16.dp)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 16.dp)
         ) {
-            Text(
-                text = "Branches",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = "Stores added here appear instantly in every dropdown, on the phone and on the PC dashboard.",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+            Spacer(Modifier.height(16.dp))
+
+            ScreenHeader(
+                title = "Branches",
+                subtitle = "Stores added here appear instantly in every dropdown, on the phone and on the PC dashboard."
             )
 
-            if (BranchStore.isLoading && BranchStore.all.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else if (BranchStore.all.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        "No branches yet. Tap “Add branch” to create your first store.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            when {
+                BranchStore.isLoading && BranchStore.all.isEmpty() -> LoadingCards(count = 3)
+
+                BranchStore.all.isEmpty() -> EmptyState(
+                    icon = Icons.Default.Storefront,
+                    title = "No stores yet",
+                    message = "Add your first branch and it becomes available everywhere in the system.",
+                    actionLabel = "Add branch",
+                    onAction = { showAddDialog = true }
+                )
+
+                else -> LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 96.dp)
+                ) {
                     items(BranchStore.branches, key = { it.branch_id ?: it.name }) { branch ->
                         BranchCard(
                             branch = branch,
@@ -84,15 +85,7 @@ fun BranchScreen() {
                     }
 
                     if (BranchStore.archived.isNotEmpty()) {
-                        item {
-                            Text(
-                                "Archived",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
-                            )
-                        }
+                        item { SectionLabel("Archived") }
                         items(BranchStore.archived, key = { it.branch_id ?: it.name }) { branch ->
                             BranchCard(
                                 branch = branch,
@@ -101,11 +94,7 @@ fun BranchScreen() {
                                 onAction = {
                                     scope.launch {
                                         val err = BranchStore.setActive(branch, true)
-                                        Toast.makeText(
-                                            context,
-                                            err ?: "${branch.name} restored",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        snackbar.showSnackbar(err ?: "${branch.name} restored")
                                     }
                                 }
                             )
@@ -119,29 +108,30 @@ fun BranchScreen() {
     pendingArchive?.let { branch ->
         AlertDialog(
             onDismissRequest = { pendingArchive = null },
+            containerColor = Ink700,
             title = { Text("Archive ${branch.name}?") },
             text = {
                 Text(
                     "It disappears from every dropdown on the phone and the PC dashboard. " +
                         "Its stock, tickets and history are kept, and you can restore it " +
-                        "from the Archived list below."
+                        "from the Archived list below.",
+                    color = Ash
                 )
             },
             confirmButton = {
-                Button(onClick = {
-                    pendingArchive = null
-                    scope.launch {
-                        val err = BranchStore.setActive(branch, false)
-                        Toast.makeText(
-                            context,
-                            err ?: "${branch.name} archived",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = Rose, contentColor = Chalk),
+                    onClick = {
+                        pendingArchive = null
+                        scope.launch {
+                            val err = BranchStore.setActive(branch, false)
+                            snackbar.showSnackbar(err ?: "${branch.name} archived")
+                        }
                     }
-                }) { Text("Archive") }
+                ) { Text("Archive") }
             },
             dismissButton = {
-                TextButton(onClick = { pendingArchive = null }) { Text("Cancel") }
+                TextButton(onClick = { pendingArchive = null }) { Text("Cancel", color = Ash) }
             }
         )
     }
@@ -151,7 +141,7 @@ fun BranchScreen() {
             onDismiss = { showAddDialog = false },
             onAdded = { name ->
                 showAddDialog = false
-                Toast.makeText(context, "$name added", Toast.LENGTH_SHORT).show()
+                scope.launch { snackbar.showSnackbar("$name added") }
             }
         )
     }
@@ -164,47 +154,48 @@ private fun BranchCard(
     dimmed: Boolean = false,
     onAction: () -> Unit
 ) {
-    val alpha = if (dimmed) 0.55f else 1f
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    // What this store is actually holding right now, straight from the live store.
+    val devices = LiveStore.gadgetsIn(branch.name).size
+    val parts = LiveStore.partsIn(branch.name).size
+    val open = LiveStore.ticketsIn(branch.name).count { it.ticket_status != "Completed" }
+
+    AppCard(modifier = Modifier.alpha(if (dimmed) 0.55f else 1f)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (branch.is_main) {
                         Icon(
                             Icons.Default.Star,
                             contentDescription = "Main store",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .size(16.dp)
-                                .padding(end = 2.dp)
+                            tint = Amber,
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(Modifier.width(6.dp))
                     }
-                    Text(
-                        branch.name,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
-                    )
+                    Text(branch.name, style = MaterialTheme.typography.titleLarge)
                 }
                 val details = listOfNotNull(branch.code, branch.address, branch.phone)
                 if (details.isNotEmpty()) {
                     Text(
                         details.joinToString(" · "),
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Ash,
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
             }
-            TextButton(onClick = onAction) { Text(actionLabel) }
+            TextButton(onClick = onAction) {
+                Text(actionLabel, color = if (dimmed) Cyan else Ash)
+            }
+        }
+
+        if (!dimmed) {
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusPill("$devices devices", Cyan, dense = true)
+                StatusPill("$parts part lines", Azure, dense = true)
+                StatusPill("$open open repairs", if (open > 0) Violet else Slate, dense = true)
+            }
         }
     }
 }
@@ -221,44 +212,21 @@ private fun AddBranchDialog(onDismiss: () -> Unit, onAdded: (String) -> Unit) {
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
+        containerColor = Ink700,
         title = { Text("Add branch") },
         text = {
-            Column {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Store name *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                )
-                OutlinedTextField(
-                    value = code,
-                    onValueChange = { code = it },
-                    label = { Text("Short code (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                )
-                OutlinedTextField(
-                    value = address,
-                    onValueChange = { address = it },
-                    label = { Text("Address (optional)") },
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                )
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("Contact number (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                )
-                error?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AppTextField(name, { name = it }, "Store name *")
+                AppTextField(code, { code = it }, "Short code (optional)")
+                AppTextField(address, { address = it }, "Address (optional)")
+                AppTextField(phone, { phone = it }, "Contact number (optional)")
+                ErrorBanner(error)
             }
         },
         confirmButton = {
             Button(
                 enabled = !busy && name.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Ink900),
                 onClick = {
                     busy = true
                     error = null
@@ -273,7 +241,7 @@ private fun AddBranchDialog(onDismiss: () -> Unit, onAdded: (String) -> Unit) {
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancel") }
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancel", color = Ash) }
         }
     )
 }

@@ -1,30 +1,38 @@
 package com.ryuuflores2006.inventorysystem.ui.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ryuuflores2006.inventorysystem.data.BranchStore
-import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
-import com.ryuuflores2006.inventorysystem.data.RetailGadget
 import com.ryuuflores2006.inventorysystem.data.RepairPart
+import com.ryuuflores2006.inventorysystem.data.RetailGadget
+import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
+import com.ryuuflores2006.inventorysystem.ui.components.*
+import com.ryuuflores2006.inventorysystem.ui.theme.Ash
+import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
+import com.ryuuflores2006.inventorysystem.ui.theme.Ink600
 import kotlinx.coroutines.launch
 
+/**
+ * Receiving screen. Two tracks: a serialized phone (one row, one IMEI) or a
+ * bulk part line (a quantity). The form validates before it touches the
+ * network so a bad IMEI never reaches the database.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val snackbar = remember { SnackbarHostState() }
 
     var isSerialized by remember { mutableStateOf(true) }
     var selectedBranch by remember { mutableStateOf("") }
@@ -37,7 +45,7 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
         if (selectedBranch !in BranchStore.names) selectedBranch = BranchStore.defaultName
     }
 
-    // Fields for Serialized Track
+    // Serialized track
     var sku by remember { mutableStateOf("") }
     var brand by remember { mutableStateOf("") }
     var model by remember { mutableStateOf("") }
@@ -50,360 +58,268 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     var imei2 by remember { mutableStateOf("") }
     var supplierName by remember { mutableStateOf("") }
 
-    // Fields for Bulk Track
+    // Bulk track
     var partName by remember { mutableStateOf("") }
     var compatibleModelsInput by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
     var minThreshold by remember { mutableStateOf("5") }
 
     var isSubmitting by remember { mutableStateOf(false) }
+    var formError by remember { mutableStateOf<String?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(scrollState)
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "Delivery Stock-In Log",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+    val imeiLooksWrong = imei1.isNotBlank() && imei1.length != 15
+    val margin = (retailPrice.toDoubleOrNull() ?: 0.0) - (costPrice.toDoubleOrNull() ?: 0.0)
 
-        // Branch Selection
-        var branchExpanded by remember { mutableStateOf(false) }
-        Box(modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(
-                onClick = { branchExpanded = true },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground)
-            ) {
-                Text(
-                    if (selectedBranch.isBlank()) "Receiving Branch: none yet — add one first"
-                    else "Receiving Branch: $selectedBranch"
+    fun resetForm() {
+        sku = ""; brand = ""; model = ""; storage = ""; ram = ""; color = ""
+        costPrice = ""; retailPrice = ""; imei1 = ""; imei2 = ""; supplierName = ""
+        partName = ""; compatibleModelsInput = ""; quantity = ""
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(MaterialTheme.colorScheme.background)
+                .verticalScroll(scrollState)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            ScreenHeader(
+                title = "Stock-In",
+                subtitle = "Log a delivery into a branch"
+            )
+
+            ErrorBanner(formError)
+
+            AppDropdown(
+                label = "Receiving branch",
+                selected = selectedBranch,
+                options = BranchStore.names,
+                onSelect = { selectedBranch = it },
+                emptyHint = "No branches yet — add one first"
+            )
+
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = isSerialized,
+                    onClick = { isSerialized = true; formError = null },
+                    shape = SegmentedButtonDefaults.itemShape(0, 2),
+                    colors = segmentColors(),
+                    label = { Text("Phone (serialized)") }
+                )
+                SegmentedButton(
+                    selected = !isSerialized,
+                    onClick = { isSerialized = false; formError = null },
+                    shape = SegmentedButtonDefaults.itemShape(1, 2),
+                    colors = segmentColors(),
+                    label = { Text("Parts (bulk)") }
                 )
             }
-            DropdownMenu(
-                expanded = branchExpanded,
-                onDismissRequest = { branchExpanded = false },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                BranchStore.names.forEach { loc ->
-                    DropdownMenuItem(
-                        text = { Text(loc) },
-                        onClick = {
-                            selectedBranch = loc
-                            branchExpanded = false
-                        }
+
+            if (isSerialized) {
+                SectionLabel("Device")
+                AppTextField(sku, { sku = it }, "SKU *", placeholder = "e.g. IPH15P-256-BLK")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppTextField(brand, { brand = it }, "Brand", modifier = Modifier.weight(1f))
+                    AppTextField(model, { model = it }, "Model", modifier = Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppDropdown(
+                        label = "Storage",
+                        selected = storage,
+                        options = listOf("64GB", "128GB", "256GB", "512GB", "1TB"),
+                        onSelect = { storage = it },
+                        emptyHint = "—",
+                        modifier = Modifier.weight(1f)
+                    )
+                    AppDropdown(
+                        label = "RAM",
+                        selected = ram,
+                        options = listOf("4GB", "6GB", "8GB", "12GB", "16GB"),
+                        onSelect = { ram = it },
+                        emptyHint = "—",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                AppTextField(color, { color = it }, "Colour")
+
+                SectionLabel("Identity")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.Top
+                ) {
+                    AppTextField(
+                        value = imei1,
+                        onValueChange = { imei1 = it.filter { c -> c.isDigit() }.take(15) },
+                        label = "IMEI 1 *",
+                        keyboardType = KeyboardType.Number,
+                        isError = imeiLooksWrong,
+                        supportingText = if (imeiLooksWrong) "${imei1.length}/15 digits" else null,
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilledTonalIconButton(
+                        onClick = { onScanClick { scanned -> imei1 = scanned.filter { it.isDigit() }.take(15) } },
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = Ink600,
+                            contentColor = Cyan
+                        ),
+                        modifier = Modifier
+                            .padding(top = 6.dp)
+                            .size(56.dp)
+                    ) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan IMEI")
+                    }
+                }
+                AppTextField(
+                    value = imei2,
+                    onValueChange = { imei2 = it.filter { c -> c.isDigit() }.take(15) },
+                    label = "IMEI 2 (optional)",
+                    keyboardType = KeyboardType.Number
+                )
+                AppTextField(supplierName, { supplierName = it }, "Supplier (optional)")
+            } else {
+                SectionLabel("Part")
+                AppTextField(sku, { sku = it }, "Part SKU *")
+                AppTextField(partName, { partName = it }, "Part or accessory name")
+                AppTextField(
+                    value = compatibleModelsInput,
+                    onValueChange = { compatibleModelsInput = it },
+                    label = "Fits which models",
+                    placeholder = "Comma-separated, e.g. iPhone 13, iPhone 14"
+                )
+
+                SectionLabel("Quantity")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppTextField(
+                        value = quantity,
+                        onValueChange = { quantity = it.filter { c -> c.isDigit() } },
+                        label = "Qty received",
+                        keyboardType = KeyboardType.Number,
+                        modifier = Modifier.weight(1f)
+                    )
+                    AppTextField(
+                        value = minThreshold,
+                        onValueChange = { minThreshold = it.filter { c -> c.isDigit() } },
+                        label = "Reorder at",
+                        keyboardType = KeyboardType.Number,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Segmented Track Picker
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Button(
-                onClick = { isSerialized = true },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isSerialized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Text(
-                    "Serialized (Phone)",
-                    color = if (isSerialized) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(
-                onClick = { isSerialized = false },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (!isSerialized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Text(
-                    "Bulk Parts/Accs",
-                    color = if (!isSerialized) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (isSerialized) {
-            // Serialized inputs
-            OutlinedTextField(
-                value = sku,
-                onValueChange = { sku = it },
-                label = { Text("SKU") },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            )
-            OutlinedTextField(
-                value = brand,
-                onValueChange = { brand = it },
-                label = { Text("Brand") },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            )
-            OutlinedTextField(
-                value = model,
-                onValueChange = { model = it },
-                label = { Text("Model") },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            )
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                DropdownField(
-                    value = storage,
-                    onValueChange = { storage = it },
-                    label = "Storage",
-                    options = listOf("64GB", "128GB", "256GB", "512GB", "1TB"),
-                    modifier = Modifier.weight(1f).padding(end = 4.dp)
-                )
-                DropdownField(
-                    value = ram,
-                    onValueChange = { ram = it },
-                    label = "RAM",
-                    options = listOf("4GB", "6GB", "8GB", "12GB", "16GB"),
-                    modifier = Modifier.weight(1f).padding(start = 4.dp)
-                )
-            }
-            OutlinedTextField(
-                value = color,
-                onValueChange = { color = it },
-                label = { Text("Color") },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            )
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                OutlinedTextField(
+            SectionLabel("Pricing")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AppTextField(
                     value = costPrice,
                     onValueChange = { costPrice = it },
-                    label = { Text("Cost Price") },
-                    modifier = Modifier.weight(1f).padding(end = 4.dp)
+                    label = "Cost price",
+                    keyboardType = KeyboardType.Decimal,
+                    modifier = Modifier.weight(1f)
                 )
-                OutlinedTextField(
+                AppTextField(
                     value = retailPrice,
                     onValueChange = { retailPrice = it },
-                    label = { Text("Retail Price") },
-                    modifier = Modifier.weight(1f).padding(start = 4.dp)
+                    label = if (isSerialized) "Retail price" else "Service price",
+                    keyboardType = KeyboardType.Decimal,
+                    modifier = Modifier.weight(1f)
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                OutlinedTextField(
-                    value = imei1,
-                    onValueChange = { imei1 = it },
-                    label = { Text("Unique IMEI 1") },
-                    modifier = Modifier.weight(1f).padding(end = 8.dp)
-                )
-                Button(
-                    onClick = {
-                        onScanClick { scannedImei ->
-                            imei1 = scannedImei
-                        }
-                    },
-                    modifier = Modifier.padding(top = 10.dp)
-                ) {
-                    Text("Scan")
-                }
-            }
-            OutlinedTextField(
-                value = imei2,
-                onValueChange = { imei2 = it },
-                label = { Text("IMEI 2 (Optional)") },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            )
-            OutlinedTextField(
-                value = supplierName,
-                onValueChange = { supplierName = it },
-                label = { Text("Supplier Name (Optional)") },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            )
-        } else {
-            // Bulk inputs
-            OutlinedTextField(
-                value = sku,
-                onValueChange = { sku = it },
-                label = { Text("Part SKU") },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            )
-            OutlinedTextField(
-                value = partName,
-                onValueChange = { partName = it },
-                label = { Text("Part/Accessory Name") },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            )
-            OutlinedTextField(
-                value = compatibleModelsInput,
-                onValueChange = { compatibleModelsInput = it },
-                label = { Text("Compatible Models (comma-separated)") },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            )
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                OutlinedTextField(
-                    value = quantity,
-                    onValueChange = { quantity = it },
-                    label = { Text("Qty Received") },
-                    modifier = Modifier.weight(1f).padding(end = 4.dp)
-                )
-                OutlinedTextField(
-                    value = minThreshold,
-                    onValueChange = { minThreshold = it },
-                    label = { Text("Min Stock Alert") },
-                    modifier = Modifier.weight(1f).padding(start = 4.dp)
+            if (costPrice.isNotBlank() && retailPrice.isNotBlank()) {
+                Text(
+                    "Margin ${peso(margin)} per unit",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Ash
                 )
             }
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                OutlinedTextField(
-                    value = costPrice,
-                    onValueChange = { costPrice = it },
-                    label = { Text("Cost Price") },
-                    modifier = Modifier.weight(1f).padding(end = 4.dp)
-                )
-                OutlinedTextField(
-                    value = retailPrice,
-                    onValueChange = { retailPrice = it },
-                    label = { Text("Service/Retail Price") },
-                    modifier = Modifier.weight(1f).padding(start = 4.dp)
-                )
-            }
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(8.dp))
 
-        Button(
-            onClick = {
-                if (selectedBranch.isBlank()) {
-                    Toast.makeText(context, "Add a branch first (Branches tab)", Toast.LENGTH_LONG).show()
-                    return@Button
-                }
-                if (sku.isBlank()) {
-                    Toast.makeText(context, "SKU is required", Toast.LENGTH_SHORT).show()
-                    return@Button
-                }
-                isSubmitting = true
-                scope.launch {
-                    val success = if (isSerialized) {
+            PrimaryButton(
+                text = if (isSerialized) "Receive device" else "Receive parts",
+                busy = isSubmitting,
+                icon = Icons.Default.CheckCircle,
+                onClick = {
+                    formError = null
+                    if (selectedBranch.isBlank()) {
+                        formError = "Add a branch first, from the Branches tab."
+                        return@PrimaryButton
+                    }
+                    if (sku.isBlank()) {
+                        formError = "SKU is required."
+                        return@PrimaryButton
+                    }
+                    if (isSerialized && imei1.length != 15) {
+                        formError = "IMEI 1 must be exactly 15 digits."
+                        return@PrimaryButton
+                    }
+                    isSubmitting = true
+                    scope.launch {
                         val cost = costPrice.toDoubleOrNull() ?: 0.0
                         val retail = retailPrice.toDoubleOrNull() ?: 0.0
-                        if (imei1.length != 15) {
-                            Toast.makeText(context, "IMEI 1 must be 15 digits", Toast.LENGTH_SHORT).show()
-                            isSubmitting = false
-                            return@launch
+                        val success = if (isSerialized) {
+                            SupabaseHelper.insertGadget(
+                                RetailGadget(
+                                    sku = sku.trim(),
+                                    brand = brand.trim(),
+                                    model = model.trim(),
+                                    storage = storage,
+                                    ram = ram,
+                                    color = color.trim(),
+                                    cost_price = cost,
+                                    retail_price = retail,
+                                    current_branch = selectedBranch,
+                                    status = "In Stock",
+                                    imei_1 = imei1,
+                                    imei_2 = imei2.takeIf { it.isNotBlank() },
+                                    supplier_name = supplierName.takeIf { it.isNotBlank() }
+                                )
+                            )
+                        } else {
+                            SupabaseHelper.insertPartStock(
+                                RepairPart(
+                                    sku = sku.trim(),
+                                    part_name = partName.trim(),
+                                    compatible_models = compatibleModelsInput
+                                        .split(",")
+                                        .map { it.trim() }
+                                        .filter { it.isNotBlank() },
+                                    branch_location = selectedBranch,
+                                    stock_qty = quantity.toIntOrNull() ?: 1,
+                                    minimum_stock_threshold = minThreshold.toIntOrNull() ?: 5,
+                                    cost_price = cost,
+                                    service_price = retail
+                                )
+                            )
                         }
-                        val gadget = RetailGadget(
-                            sku = sku,
-                            brand = brand,
-                            model = model,
-                            storage = storage,
-                            ram = ram,
-                            color = color,
-                            cost_price = cost,
-                            retail_price = retail,
-                            current_branch = selectedBranch,
-                            status = "In Stock",
-                            imei_1 = imei1,
-                            imei_2 = imei2.takeIf { it.isNotBlank() },
-                            supplier_name = supplierName.takeIf { it.isNotBlank() }
-                        )
-                        SupabaseHelper.insertGadget(gadget)
-                    } else {
-                        val cost = costPrice.toDoubleOrNull() ?: 0.0
-                        val service = retailPrice.toDoubleOrNull() ?: 0.0
-                        val qty = quantity.toIntOrNull() ?: 1
-                        val threshold = minThreshold.toIntOrNull() ?: 5
-                        val compat = compatibleModelsInput.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                        val part = RepairPart(
-                            sku = sku,
-                            part_name = partName,
-                            compatible_models = compat,
-                            branch_location = selectedBranch,
-                            stock_qty = qty,
-                            minimum_stock_threshold = threshold,
-                            cost_price = cost,
-                            service_price = service
-                        )
-                        SupabaseHelper.insertPartStock(part)
-                    }
-
-                    isSubmitting = false
-                    if (success) {
-                        Toast.makeText(context, "Stock logged successfully!", Toast.LENGTH_LONG).show()
-                        // Reset forms
-                        sku = ""
-                        brand = ""
-                        model = ""
-                        storage = ""
-                        ram = ""
-                        color = ""
-                        costPrice = ""
-                        retailPrice = ""
-                        imei1 = ""
-                        imei2 = ""
-                        supplierName = ""
-                        partName = ""
-                        compatibleModelsInput = ""
-                        quantity = ""
-                    } else {
-                        Toast.makeText(context, "Failed to register stock. Check duplicate values or network.", Toast.LENGTH_LONG).show()
+                        isSubmitting = false
+                        if (success) {
+                            resetForm()
+                            snackbar.showSnackbar("Logged into $selectedBranch")
+                        } else {
+                            formError =
+                                "Could not save. That SKU or IMEI may already exist, or you are offline."
+                        }
                     }
                 }
-            },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            enabled = !isSubmitting,
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            if (isSubmitting) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
-            } else {
-                Text("Confirm Stock-In Receipt", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            }
+            )
+
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropdownField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    options: List<String>,
-    modifier: Modifier = Modifier
-) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-        modifier = modifier
-    ) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor()
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            options.forEach { selectionOption ->
-                DropdownMenuItem(
-                    text = { Text(selectionOption) },
-                    onClick = {
-                        onValueChange(selectionOption)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
-}
+private fun segmentColors() = SegmentedButtonDefaults.colors(
+    activeContainerColor = Cyan.copy(alpha = 0.16f),
+    activeContentColor = Cyan,
+    activeBorderColor = Cyan.copy(alpha = 0.5f),
+    inactiveContainerColor = Ink600,
+    inactiveContentColor = Ash,
+    inactiveBorderColor = com.ryuuflores2006.inventorysystem.ui.theme.Ink500
+)

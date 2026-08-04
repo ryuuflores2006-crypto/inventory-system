@@ -19,6 +19,21 @@ data class Branch(
     val updated_at: String? = null
 )
 
+/**
+ * A published APK build. The in-app updater compares [version_code] with the
+ * installed package's versionCode and offers a download when it is higher.
+ */
+@Serializable
+data class AppRelease(
+    val release_id: String? = null,
+    val version_code: Int,
+    val version_name: String,
+    val apk_url: String,
+    val release_notes: String? = null,
+    val is_mandatory: Boolean = false,
+    val published_at: String? = null
+)
+
 @Serializable
 enum class GadgetStatus {
     InStock, Reserved, Sold, InTransit, Returned

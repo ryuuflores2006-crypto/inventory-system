@@ -65,6 +65,9 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
+  const [isLive, setIsLive] = useState(false);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const searchRef = React.useRef<HTMLInputElement>(null);
 
   const notify = useCallback((kind: Toast['kind'], text: string) => {
     setToast({ kind, text });
@@ -96,6 +99,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
       setTickets((tRes.data ?? []) as ServiceTicket[]);
       setTransfers((trRes.data ?? []) as BranchTransfer[]);
       setTicketPartsUsed((tpRes.data ?? []) as TicketPartsUsed[]);
+      setLastSynced(new Date());
     }
     setIsLoading(false);
   }, []);
@@ -104,16 +108,37 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
     loadAll();
   }, [loadAll]);
 
-  // Live sync across devices (phone stock-in shows up on the PC instantly)
+  // Live sync across devices (phone stock-in shows up on the PC instantly).
+  // The subscribe callback tells us whether the socket is genuinely up, so the
+  // sidebar pill reports the real state instead of assuming it.
   useEffect(() => {
     const channel = supabase
       .channel('inventory-sync')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => loadAll())
-      .subscribe();
+      .subscribe((status) => setIsLive(status === 'SUBSCRIBED'));
     return () => {
+      setIsLive(false);
       supabase.removeChannel(channel);
     };
   }, [loadAll]);
+
+  // "/" jumps to the search box, Escape clears it — the counter staff live in
+  // this page all day and reach for the keyboard.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement;
+      const typing = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
+      if (e.key === '/' && !typing) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === 'Escape' && el === searchRef.current) {
+        setSearchQuery('');
+        searchRef.current?.blur();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const activeBranches = useMemo(() => branches.filter((b) => b.is_active), [branches]);
   const branchNames = useMemo(() => activeBranches.map((b) => b.name), [activeBranches]);
@@ -287,8 +312,8 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
           ).map(([key, Icon, label]) => (
             <button
               key={key}
-              className={`btn ${activeTab === key ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ width: '100%', justifyContent: 'flex-start' }}
+              className={`nav-item ${activeTab === key ? 'is-active' : ''}`}
+              aria-current={activeTab === key ? 'page' : undefined}
               onClick={() => setActiveTab(key)}
             >
               <Icon size={18} />
@@ -307,18 +332,19 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: loadError ? 'var(--color-danger)' : 'var(--color-success)',
-                }}
+              <span
+                className={`live-dot ${loadError ? 'is-error' : isLive ? '' : 'is-off'}`}
+                aria-hidden
               />
               <div style={{ overflow: 'hidden' }}>
                 <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
-                  {loadError ? 'Connection problem' : 'Supabase live'}
+                  {loadError ? 'Connection problem' : isLive ? 'Live — syncing' : 'Connecting…'}
                 </div>
+                {!loadError && lastSynced && (
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>
+                    Updated {lastSynced.toLocaleTimeString()}
+                  </div>
+                )}
                 <div
                   style={{
                     fontSize: '0.65rem',
@@ -342,11 +368,10 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
       </aside>
 
       <main className="main-content">
+        {isLoading && <div className="top-progress" role="progressbar" aria-label="Loading" />}
+
         {toast && (
-          <div
-            className={`badge ${toast.kind === 'ok' ? 'badge-success' : 'badge-danger'}`}
-            style={{ display: 'block', padding: '12px 16px', marginBottom: 16 }}
-          >
+          <div className={`toast ${toast.kind === 'ok' ? 'is-ok' : 'is-err'}`} role="status">
             {toast.text}
           </div>
         )}
@@ -429,6 +454,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
               {selectedBranch === ALL_BRANCHES
                 ? `Managing ${activeBranches.length} branch${activeBranches.length === 1 ? '' : 'es'}`
                 : `Scoped to ${selectedBranch}`}
+              {q && ` · filtered by “${searchQuery.trim()}”`}
             </p>
           </div>
 
@@ -448,7 +474,8 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
               >
                 <Search size={18} color="var(--text-muted)" />
                 <input
-                  type="text"
+                  ref={searchRef}
+                  type="search"
                   placeholder="Search SKU, IMEI, model, client…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -461,6 +488,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                     width: '100%',
                   }}
                 />
+                {!searchQuery && <span className="kbd">/</span>}
               </div>
             )}
             <button className="btn btn-secondary" onClick={loadAll} disabled={isLoading} title="Refresh">
@@ -487,13 +515,13 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                   className={`btn ${inventorySubTab === 'serialized' ? 'btn-primary' : 'btn-secondary'}`}
                   onClick={() => setInventorySubTab('serialized')}
                 >
-                  Serialized phones / tablets
+                  Serialized phones / tablets ({filteredGadgets.length})
                 </button>
                 <button
                   className={`btn ${inventorySubTab === 'bulk' ? 'btn-primary' : 'btn-secondary'}`}
                   onClick={() => setInventorySubTab('bulk')}
                 >
-                  Accessories &amp; spare components
+                  Accessories &amp; spare components ({filteredParts.length})
                 </button>
               </div>
               <div style={{ display: 'flex', gap: 12 }}>

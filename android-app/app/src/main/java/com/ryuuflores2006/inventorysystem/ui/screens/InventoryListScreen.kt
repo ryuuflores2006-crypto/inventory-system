@@ -4,171 +4,167 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ryuuflores2006.inventorysystem.data.BranchStore
-import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
-import com.ryuuflores2006.inventorysystem.data.RetailGadget
+import com.ryuuflores2006.inventorysystem.data.LiveStore
 import com.ryuuflores2006.inventorysystem.data.RepairPart
+import com.ryuuflores2006.inventorysystem.data.RetailGadget
+import com.ryuuflores2006.inventorysystem.ui.components.*
+import com.ryuuflores2006.inventorysystem.ui.theme.*
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Stock across every store. Reads [LiveStore], so a sale rung up on another
+ * phone or the PC dashboard changes this list without anyone pressing refresh.
+ */
 @Composable
-fun InventoryListScreen() {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var searchQuery by remember { mutableStateOf("") }
-    var branchFilter by remember { mutableStateOf("All Branches") }
-
+fun InventoryListScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     val scope = rememberCoroutineScope()
-    var gadgets by remember { mutableStateOf<List<RetailGadget>>(emptyList()) }
-    var parts by remember { mutableStateOf<List<RepairPart>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(false) }
+    var showParts by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var branchFilter by remember { mutableStateOf(ALL_BRANCHES) }
 
-    LaunchedEffect(Unit) {
-        if (BranchStore.branches.isEmpty()) BranchStore.refresh()
+    LaunchedEffect(BranchStore.branches) {
+        if (branchFilter != ALL_BRANCHES && branchFilter !in BranchStore.names) {
+            branchFilter = ALL_BRANCHES
+        }
     }
 
-    // Fetch data
-    LaunchedEffect(key1 = selectedTab, key2 = branchFilter) {
-        isLoading = true
-        scope.launch {
-            if (selectedTab == 0) {
-                val list = SupabaseHelper.getAllGadgets()
-                gadgets = if (branchFilter == "All Branches") {
-                    list
-                } else {
-                    list.filter { it.current_branch == branchFilter }
-                }
-            } else {
-                val targetBranch = if (branchFilter == "All Branches") null else branchFilter
-                parts = SupabaseHelper.getAllParts(targetBranch)
-            }
-            isLoading = false
-        }
+    val branch = branchFilter.takeIf { it != ALL_BRANCHES }
+    val query = searchQuery.trim()
+
+    val gadgets = remember(LiveStore.gadgets, branch, query) {
+        LiveStore.gadgetsIn(branch).filter { g ->
+            query.isBlank() ||
+                g.imei_1.contains(query, true) ||
+                (g.imei_2?.contains(query, true) == true) ||
+                g.sku.contains(query, true) ||
+                g.brand.contains(query, true) ||
+                g.model.contains(query, true)
+        }.sortedBy { "${it.brand} ${it.model}" }
+    }
+    val parts = remember(LiveStore.parts, branch, query) {
+        LiveStore.partsIn(branch).filter { p ->
+            query.isBlank() ||
+                p.sku.contains(query, true) ||
+                p.part_name.contains(query, true) ||
+                p.compatible_models.any { it.contains(query, true) }
+        }.sortedBy { it.part_name }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
+            .padding(horizontal = 16.dp)
     ) {
-        Text(
-            text = "Branch Inventory",
-            color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 12.dp)
+        Spacer(Modifier.height(16.dp))
+
+        ScreenHeader(
+            title = "Inventory",
+            subtitle = if (branch == null) "All branches" else branch,
+            trailing = {
+                IconButton(onClick = { scope.launch { LiveStore.refresh() } }) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Ash)
+                }
+            }
         )
 
-        // Branch Selector & Search
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Simple Branch Dropdown trigger
-            var dropdownExpanded by remember { mutableStateOf(false) }
-            Box {
-                Button(
-                    onClick = { dropdownExpanded = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Text(text = branchFilter, color = MaterialTheme.colorScheme.onSurface)
-                }
-                DropdownMenu(
-                    expanded = dropdownExpanded,
-                    onDismissRequest = { dropdownExpanded = false }
-                ) {
-                    (listOf("All Branches") + BranchStore.names).forEach { loc ->
-                        DropdownMenuItem(
-                            text = { Text(loc) },
-                            onClick = {
-                                branchFilter = loc
-                                dropdownExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Search query textfield
-            OutlinedTextField(
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SearchField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search IMEI or SKU", fontSize = 12.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 8.dp)
-                    .height(52.dp),
-                colors = TextFieldDefaults.outlinedTextFieldColors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.surface
-                ),
-                shape = RoundedCornerShape(12.dp)
+                placeholder = if (showParts) "Search part or SKU" else "Search IMEI, SKU or model",
+                modifier = Modifier.weight(1f)
             )
+            Spacer(Modifier.width(8.dp))
+            FilledTonalIconButton(
+                onClick = { onScanClick { scanned -> searchQuery = scanned } },
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = Ink600,
+                    contentColor = Cyan
+                ),
+                modifier = Modifier.size(56.dp)
+            ) {
+                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan to search")
+            }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
-        // Tabs: Serialized vs Bulk
+        BranchFilterChips(selected = branchFilter, onSelect = { branchFilter = it })
+
+        Spacer(Modifier.height(12.dp))
+
         TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary
+            selectedTabIndex = if (showParts) 1 else 0,
+            containerColor = MaterialTheme.colorScheme.background,
+            contentColor = Cyan,
+            divider = { HorizontalDivider(color = Ink600) }
         ) {
             Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
-                text = { Text("Serialized Phones", fontWeight = FontWeight.SemiBold) }
+                selected = !showParts,
+                onClick = { showParts = false },
+                selectedContentColor = Cyan,
+                unselectedContentColor = Ash,
+                text = { Text("Devices (${LiveStore.gadgetsIn(branch).size})", fontWeight = FontWeight.SemiBold) }
             )
             Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = { Text("Bulk Parts/Accs", fontWeight = FontWeight.SemiBold) }
+                selected = showParts,
+                onClick = { showParts = true },
+                selectedContentColor = Cyan,
+                unselectedContentColor = Ash,
+                text = { Text("Parts (${LiveStore.partsIn(branch).size})", fontWeight = FontWeight.SemiBold) }
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        when {
+            LiveStore.isLoading && !LiveStore.hasLoadedOnce -> LoadingCards()
+
+            !showParts && gadgets.isEmpty() -> EmptyState(
+                icon = if (query.isBlank()) Icons.Default.Inventory2 else Icons.Default.SearchOff,
+                title = if (query.isBlank()) "No devices here yet" else "No match",
+                message = if (query.isBlank()) {
+                    "Serialized phones you receive in the Stock-In tab appear here."
+                } else {
+                    "Nothing matches “$query”."
+                }
+            )
+
+            showParts && parts.isEmpty() -> EmptyState(
+                icon = if (query.isBlank()) Icons.Default.Inventory2 else Icons.Default.SearchOff,
+                title = if (query.isBlank()) "No parts here yet" else "No match",
+                message = if (query.isBlank()) {
+                    "Bulk parts and accessories you log in the Stock-In tab appear here."
+                } else {
+                    "Nothing matches “$query”."
+                }
+            )
+
+            !showParts -> LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)
+            ) {
+                items(gadgets, key = { it.item_id ?: it.imei_1 }) { GadgetItemCard(it) }
             }
-        } else {
-            if (selectedTab == 0) {
-                val filteredGadgets = gadgets.filter {
-                    it.imei_1.contains(searchQuery, ignoreCase = true) ||
-                            it.sku.contains(searchQuery, ignoreCase = true) ||
-                            it.brand.contains(searchQuery, ignoreCase = true) ||
-                            it.model.contains(searchQuery, ignoreCase = true)
-                }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(filteredGadgets) { gadget ->
-                        GadgetItemCard(gadget)
-                    }
-                }
-            } else {
-                val filteredParts = parts.filter {
-                    it.sku.contains(searchQuery, ignoreCase = true) ||
-                            it.part_name.contains(searchQuery, ignoreCase = true)
-                }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(filteredParts) { part ->
-                        PartItemCard(part)
-                    }
-                }
+
+            else -> LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)
+            ) {
+                items(parts, key = { it.part_id ?: (it.sku + it.branch_location) }) { PartItemCard(it) }
             }
         }
     }
@@ -176,132 +172,103 @@ fun InventoryListScreen() {
 
 @Composable
 fun GadgetItemCard(gadget: RetailGadget) {
-    val statusColor = when (gadget.status) {
-        "In Stock" -> Color(0xFF22C55E)
-        "In Transit" -> Color(0xFF3B82F6)
-        "Sold" -> Color(0xFF94A3B8)
-        else -> Color(0xFFF97316)
-    }
+    var expanded by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+    AppCard(onClick = { expanded = !expanded }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("${gadget.brand} ${gadget.model}", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    text = "${gadget.brand} ${gadget.model}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(statusColor.copy(alpha = 0.2f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = gadget.status,
-                        color = statusColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("SKU: ${gadget.sku}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 13.sp)
-            Text("Specs: ${gadget.storage} / ${gadget.ram} | ${gadget.color}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 13.sp)
-            Text("IMEI 1: ${gadget.imei_1}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = gadget.current_branch,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-                Text(
-                    text = "₱${gadget.retail_price}",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
+                    listOf(gadget.storage, gadget.ram, gadget.color).filter { it.isNotBlank() }
+                        .joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Ash
                 )
             }
+            StatusPill(gadget.status, gadgetStatusColor(gadget.status))
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                gadget.current_branch,
+                style = MaterialTheme.typography.labelMedium,
+                color = Cyan,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Text(peso(gadget.retail_price), style = MaterialTheme.typography.titleLarge)
+        }
+
+        if (expanded) {
+            HorizontalDivider(color = Ink500, modifier = Modifier.padding(vertical = 12.dp))
+            DetailRow("SKU", gadget.sku)
+            DetailRow("IMEI 1", gadget.imei_1)
+            gadget.imei_2?.takeIf { it.isNotBlank() }?.let { DetailRow("IMEI 2", it) }
+            DetailRow("Cost", peso(gadget.cost_price))
+            DetailRow("Margin", peso(gadget.retail_price - gadget.cost_price), Emerald)
+            gadget.supplier_name?.takeIf { it.isNotBlank() }?.let { DetailRow("Supplier", it) }
+            DetailRow("Received", shortStamp(gadget.created_at))
+        } else {
+            Text(
+                "IMEI ${gadget.imei_1}",
+                style = MaterialTheme.typography.bodySmall,
+                color = Slate,
+                modifier = Modifier.padding(top = 6.dp)
+            )
         }
     }
 }
 
 @Composable
 fun PartItemCard(part: RepairPart) {
-    val isLowStock = part.stock_qty <= part.minimum_stock_threshold
-    val stockColor = if (isLowStock) Color(0xFFEF4444) else Color(0xFF22C55E)
+    var expanded by remember { mutableStateOf(false) }
+    val isLow = part.stock_qty <= part.minimum_stock_threshold
+    val stockColor = when {
+        part.stock_qty == 0 -> Rose
+        isLow -> Amber
+        else -> Emerald
+    }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = part.part_name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
-                )
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(stockColor.copy(alpha = 0.2f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = "Qty: ${part.stock_qty}",
-                        color = stockColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+    AppCard(onClick = { expanded = !expanded }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(part.part_name, style = MaterialTheme.typography.titleLarge)
+                Text(part.sku, style = MaterialTheme.typography.bodySmall, color = Ash)
             }
+            StatusPill("${part.stock_qty} in stock", stockColor)
+        }
 
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("SKU: ${part.sku}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 13.sp)
-            Text("Compat: ${part.compatible_models.joinToString(", ")}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 12.sp)
+        Spacer(Modifier.height(10.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = part.branch_location,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-                Text(
-                    text = "₱${part.service_price}",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
-                )
-            }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                part.branch_location,
+                style = MaterialTheme.typography.labelMedium,
+                color = Cyan,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Text(peso(part.service_price), style = MaterialTheme.typography.titleLarge)
+        }
+
+        if (isLow) {
+            Text(
+                "At or below the reorder point of ${part.minimum_stock_threshold}",
+                style = MaterialTheme.typography.bodySmall,
+                color = stockColor,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+
+        if (expanded) {
+            HorizontalDivider(color = Ink500, modifier = Modifier.padding(vertical = 12.dp))
+            DetailRow("Fits", part.compatible_models.joinToString(", ").ifBlank { "Not specified" })
+            DetailRow("Cost", peso(part.cost_price))
+            DetailRow("Margin", peso(part.service_price - part.cost_price), Emerald)
+            DetailRow("Reorder at", part.minimum_stock_threshold.toString())
+            DetailRow("Added", shortStamp(part.created_at))
         }
     }
 }

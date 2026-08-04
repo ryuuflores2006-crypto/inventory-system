@@ -364,3 +364,44 @@ INSERT INTO branches (name, code, is_main) VALUES
     ('JEHABS CELLSHOP',     'JHBS', FALSE),
     ('J-HUB CELLSHOP',      'JHUB', FALSE)
 ON CONFLICT (name) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- 14. Realtime (both clients refresh themselves when a row changes)
+-- ---------------------------------------------------------------------------
+-- Without this the postgres_changes subscriptions connect but never fire.
+DO $$
+DECLARE tbl TEXT;
+BEGIN
+    FOREACH tbl IN ARRAY ARRAY['branches','retail_gadgets','repair_parts',
+                               'service_tickets','ticket_parts_used','branch_transfers']
+    LOOP
+        BEGIN
+            EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', tbl);
+        EXCEPTION WHEN duplicate_object THEN
+            NULL;  -- already published
+        END;
+        -- Full old-row payloads on UPDATE/DELETE so clients can reconcile.
+        EXECUTE format('ALTER TABLE public.%I REPLICA IDENTITY FULL', tbl);
+    END LOOP;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 15. App releases (the Android app's in-app updater reads this)
+-- ---------------------------------------------------------------------------
+-- Publish a row here after building a new APK and the installed app will offer
+-- the update on next launch. version_code must match the APK's versionCode.
+CREATE TABLE IF NOT EXISTS app_releases (
+    release_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    version_code  INTEGER     NOT NULL UNIQUE,
+    version_name  TEXT        NOT NULL,
+    apk_url       TEXT        NOT NULL,
+    release_notes TEXT,
+    is_mandatory  BOOLEAN     NOT NULL DEFAULT FALSE,
+    published_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE app_releases ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS app_releases_read ON app_releases;
+CREATE POLICY app_releases_read ON app_releases
+    FOR SELECT TO authenticated USING (TRUE);

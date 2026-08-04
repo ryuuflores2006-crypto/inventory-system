@@ -76,7 +76,10 @@ no schema change, no rebuild. Every other table references `branches.name` with
 * **Camera scanner:** Direct hardware camera binding to scan barcodes and 15-digit IMEIs in real-time.
 * **Stock-In receipts:** Quick input for receiving supplier shipments at the branch level, with dropdown pickers for Storage and RAM to minimize manual typing, and 15-digit IMEI validation.
 * **Ticket creation:** Rapid repair intakes for customer walk-ins.
-* **Branches tab:** Add a new store straight from the phone — it appears immediately in every dropdown here and on the PC dashboard.
+* **Branches tab:** Add a new store straight from the phone — it appears immediately in every dropdown here and on the PC dashboard, with live device / part / open-repair counts per store.
+* **Home dashboard:** Landing screen with branch filter chips, four live stat cards, a reorder-soon list and the repairs currently in progress.
+* **Live sync:** One Supabase realtime subscription for the whole session. Anything anyone changes — on another phone or on the PC — redraws the screen you are looking at. The header shows a **LIVE** pill while the socket is up.
+* **In-app updates:** The app checks the `app_releases` table on launch (and from the ⋮ menu), downloads the new APK with a progress bar, and hands it to the Android package installer. Mandatory releases cannot be dismissed.
 * **Staff sign-in:** The same Supabase account works on both platforms.
 
 ### 2. Next.js Web Dashboard (`/web-dashboard`)
@@ -89,7 +92,8 @@ no schema change, no rebuild. Every other table references `branches.name` with
 * **Branch Manager:** Add, rename, re-flag the main store, or archive a branch, with per-store device / part / open-repair counts.
 * **Add forms:** Devices (with IMEI validation), parts and accessories (restocks an existing SKU at that branch instead of duplicating it), and repair tickets — all addable from the browser.
 * **Analytics:** Breakdown of store performance, ticket status distributions, and cumulative revenue, computed per branch from the live branch list.
-* **Live sync:** A Supabase realtime subscription refreshes the dashboard when a phone logs stock in.
+* **Live sync:** A Supabase realtime subscription refreshes the dashboard when a phone logs stock in. The sidebar pill reports the real socket state and the time of the last refresh.
+* **Shared design system:** `globals.css` uses the same ink surfaces, cyan accent and status colours as the Android app, so the two platforms read as one product. Collapses to a top bar on narrow screens; `/` focuses search, `Esc` clears it.
 
 ---
 

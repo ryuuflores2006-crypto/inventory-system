@@ -8,8 +8,8 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.gotrue.auth
-import io.ktor.client.plugins.cookies.AcceptAllCookiesStorage
-import io.ktor.client.plugins.cookies.HttpCookies
+import io.github.jan.supabase.realtime.Realtime
+import io.github.jan.supabase.realtime.realtime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -28,9 +28,19 @@ object SupabaseHelper {
             ) {
                 install(Postgrest)
                 install(Auth) {}
+                install(Realtime)
             }
         }
     }
+
+    /** The raw client, needed for realtime channels. */
+    val supabase: SupabaseClient
+        get() {
+            if (client == null) init()
+            return client!!
+        }
+
+    val realtime get() = supabase.realtime
 
     val postgrest: Postgrest
         get() {
@@ -197,6 +207,42 @@ object SupabaseHelper {
         } catch (e: Exception) {
             e.printStackTrace()
             false
+        }
+    }
+
+    suspend fun updateTicketStatus(ticketId: String, status: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            postgrest["service_tickets"].update({ set("ticket_status", status) }) {
+                filter { eq("ticket_id", ticketId) }
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    // --- Transfers Service ---
+    suspend fun getAllTransfers(): List<BranchTransfer> = withContext(Dispatchers.IO) {
+        try {
+            postgrest["branch_transfers"].select().decodeList()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    // --- App releases (in-app updater) ---
+    /** Newest published release, or null if none / offline. */
+    suspend fun getLatestRelease(): AppRelease? = withContext(Dispatchers.IO) {
+        try {
+            postgrest["app_releases"].select {
+                order("version_code", Order.DESCENDING)
+                limit(1)
+            }.decodeList<AppRelease>().firstOrNull()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 }
