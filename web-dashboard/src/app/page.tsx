@@ -963,14 +963,28 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                             className="btn btn-secondary"
                             style={{ padding: '6px 10px', fontSize: '0.75rem' }}
                             title={b.is_active ? 'Archive branch' : 'Reactivate branch'}
-                            onClick={() =>
+                            onClick={() => {
+                              if (b.is_active) {
+                                if (activeBranches.length <= 1) {
+                                  setLoadError('You need at least one active branch.');
+                                  return;
+                                }
+                                if (
+                                  !confirm(
+                                    `Archive ${b.name}? It disappears from every dropdown here and on the phone. ` +
+                                      'Its stock, tickets and history are kept, and you can reactivate it from this table.'
+                                  )
+                                ) {
+                                  return;
+                                }
+                              }
                               run('Branch state', () =>
                                 supabase
                                   .from('branches')
                                   .update({ is_active: !b.is_active })
                                   .eq('branch_id', b.branch_id)
-                              )
-                            }
+                              );
+                            }}
                           >
                             <Archive size={13} />
                           </button>

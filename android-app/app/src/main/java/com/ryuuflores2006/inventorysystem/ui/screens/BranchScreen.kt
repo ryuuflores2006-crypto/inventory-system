@@ -17,8 +17,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ryuuflores2006.inventorysystem.data.Branch
 import com.ryuuflores2006.inventorysystem.data.BranchStore
-import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import kotlinx.coroutines.launch
 
 /**
@@ -29,6 +29,7 @@ fun BranchScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var showAddDialog by remember { mutableStateOf(false) }
+    var pendingArchive by remember { mutableStateOf<Branch?>(null) }
 
     LaunchedEffect(Unit) { BranchStore.refresh() }
 
@@ -61,11 +62,11 @@ fun BranchScreen() {
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
             )
 
-            if (BranchStore.isLoading && BranchStore.branches.isEmpty()) {
+            if (BranchStore.isLoading && BranchStore.all.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            } else if (BranchStore.branches.isEmpty()) {
+            } else if (BranchStore.all.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         "No branches yet. Tap “Add branch” to create your first store.",
@@ -75,69 +76,74 @@ fun BranchScreen() {
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(BranchStore.branches, key = { it.branch_id ?: it.name }) { branch ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        if (branch.is_main) {
-                                            Icon(
-                                                Icons.Default.Star,
-                                                contentDescription = "Main store",
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier
-                                                    .size(16.dp)
-                                                    .padding(end = 2.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                        }
-                                        Text(
-                                            branch.name,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                    val details = listOfNotNull(branch.code, branch.address, branch.phone)
-                                    if (details.isNotEmpty()) {
-                                        Text(
-                                            details.joinToString(" · "),
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                                TextButton(onClick = {
-                                    val id = branch.branch_id ?: return@TextButton
+                        BranchCard(
+                            branch = branch,
+                            actionLabel = "Archive",
+                            onAction = { pendingArchive = branch }
+                        )
+                    }
+
+                    if (BranchStore.archived.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Archived",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                            )
+                        }
+                        items(BranchStore.archived, key = { it.branch_id ?: it.name }) { branch ->
+                            BranchCard(
+                                branch = branch,
+                                actionLabel = "Restore",
+                                dimmed = true,
+                                onAction = {
                                     scope.launch {
-                                        val ok = SupabaseHelper.setBranchActive(id, false)
-                                        if (ok) {
-                                            BranchStore.refresh()
-                                            Toast.makeText(context, "${branch.name} archived", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(
-                                                context,
-                                                "Could not archive ${branch.name}",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        }
+                                        val err = BranchStore.setActive(branch, true)
+                                        Toast.makeText(
+                                            context,
+                                            err ?: "${branch.name} restored",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     }
-                                }) {
-                                    Text("Archive")
                                 }
-                            }
+                            )
                         }
                     }
                 }
             }
         }
+    }
+
+    pendingArchive?.let { branch ->
+        AlertDialog(
+            onDismissRequest = { pendingArchive = null },
+            title = { Text("Archive ${branch.name}?") },
+            text = {
+                Text(
+                    "It disappears from every dropdown on the phone and the PC dashboard. " +
+                        "Its stock, tickets and history are kept, and you can restore it " +
+                        "from the Archived list below."
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    pendingArchive = null
+                    scope.launch {
+                        val err = BranchStore.setActive(branch, false)
+                        Toast.makeText(
+                            context,
+                            err ?: "${branch.name} archived",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }) { Text("Archive") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingArchive = null }) { Text("Cancel") }
+            }
+        )
     }
 
     if (showAddDialog) {
@@ -148,6 +154,58 @@ fun BranchScreen() {
                 Toast.makeText(context, "$name added", Toast.LENGTH_SHORT).show()
             }
         )
+    }
+}
+
+@Composable
+private fun BranchCard(
+    branch: Branch,
+    actionLabel: String,
+    dimmed: Boolean = false,
+    onAction: () -> Unit
+) {
+    val alpha = if (dimmed) 0.55f else 1f
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (branch.is_main) {
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = "Main store",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .padding(end = 2.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text(
+                        branch.name,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+                    )
+                }
+                val details = listOfNotNull(branch.code, branch.address, branch.phone)
+                if (details.isNotEmpty()) {
+                    Text(
+                        details.joinToString(" · "),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
+                    )
+                }
+            }
+            TextButton(onClick = onAction) { Text(actionLabel) }
+        }
     }
 }
 

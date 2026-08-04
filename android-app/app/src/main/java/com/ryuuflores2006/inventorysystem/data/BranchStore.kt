@@ -12,11 +12,19 @@ import androidx.compose.runtime.setValue
  * list, which means a newly added store shows up in all dropdowns at once.
  */
 object BranchStore {
-    var branches by mutableStateOf<List<Branch>>(emptyList())
+    /** Every store, archived ones included. Only the Branches screen shows these. */
+    var all by mutableStateOf<List<Branch>>(emptyList())
         private set
 
     var isLoading by mutableStateOf(false)
         private set
+
+    /** Active stores only — this is what every dropdown and form uses. */
+    val branches: List<Branch>
+        get() = all.filter { it.is_active }
+
+    val archived: List<Branch>
+        get() = all.filter { !it.is_active }
 
     val names: List<String>
         get() = branches.map { it.name }
@@ -27,8 +35,23 @@ object BranchStore {
 
     suspend fun refresh() {
         isLoading = true
-        branches = SupabaseHelper.getBranches(activeOnly = true)
+        all = SupabaseHelper.getBranches(activeOnly = false)
         isLoading = false
+    }
+
+    /**
+     * Archive or restore a store. Refuses to archive the last active one so the
+     * app can never be left with no branch to select. Returns null on success.
+     */
+    suspend fun setActive(branch: Branch, active: Boolean): String? {
+        val id = branch.branch_id ?: return "This branch has no id yet."
+        if (!active && branches.size <= 1) {
+            return "You need at least one active branch."
+        }
+        val ok = SupabaseHelper.setBranchActive(id, active)
+        if (!ok) return "Could not update ${branch.name}."
+        refresh()
+        return null
     }
 
     /** Returns null on success, or an error message. Refreshes on success. */
