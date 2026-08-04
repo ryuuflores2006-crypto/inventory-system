@@ -22,6 +22,7 @@ import {
   Star,
   Archive,
   Pencil,
+  Trash2,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
@@ -241,6 +242,42 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
     notify('ok', `${label} saved.`);
     await loadAll();
     return true;
+  };
+
+  /**
+   * Remove a row that should never have existed — a mis-typed IMEI at intake,
+   * a duplicated part.
+   *
+   * Only stock that has not done anything yet can go: once a unit has been
+   * sold, sent to another store or consumed by a repair, deleting it would
+   * quietly rewrite the day's takings. Those are refused with a reason rather
+   * than silently ignored, so the counter staff know to fix the status
+   * instead.
+   */
+  const deleteGadget = async (g: RetailGadget) => {
+    if (g.status === 'Sold' || g.status === 'In Transit') {
+      notify('err', `Cannot delete a device that is “${g.status}”. Change its status first.`);
+      return;
+    }
+    if (transfers.some((t) => t.reference_identifier === g.imei_1)) {
+      notify('err', 'This unit has transfer history — it cannot be deleted, only re-branched.');
+      return;
+    }
+    if (!window.confirm(`Delete ${g.brand} ${g.model} (IMEI ${g.imei_1})? This cannot be undone.`)) return;
+    await run('Device deleted', () => supabase.from('retail_gadgets').delete().eq('item_id', g.item_id));
+  };
+
+  const deletePart = async (p: RepairPart) => {
+    if (ticketPartsUsed.some((u) => u.part_id === p.part_id)) {
+      notify('err', 'This part has been used on a repair — it cannot be deleted.');
+      return;
+    }
+    if (transfers.some((t) => t.reference_identifier === p.sku)) {
+      notify('err', 'This SKU has transfer history — it cannot be deleted.');
+      return;
+    }
+    if (!window.confirm(`Delete ${p.part_name} (${p.sku}) at ${p.branch_location}? This cannot be undone.`)) return;
+    await run('Part deleted', () => supabase.from('repair_parts').delete().eq('part_id', p.part_id));
   };
 
   const exportToCSV = <T extends object>(rows: T[], filename: string) => {
@@ -560,6 +597,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                       <th>Status</th>
                       <th>Cost</th>
                       <th>Retail</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -606,9 +644,12 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                         </td>
                         <td style={{ fontSize: '0.9rem' }}>{peso(g.cost_price)}</td>
                         <td style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>{peso(g.retail_price)}</td>
+                        <td>
+                          <RowDelete label={`Delete ${g.brand} ${g.model}`} onClick={() => deleteGadget(g)} />
+                        </td>
                       </tr>
                     ))}
-                    <EmptyRow span={8} show={filteredGadgets.length === 0} text="No devices logged yet. Use “Add device”." />
+                    <EmptyRow span={9} show={filteredGadgets.length === 0} text="No devices logged yet. Use “Add device”." />
                   </tbody>
                 </table>
               </div>
@@ -624,6 +665,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                       <th>Stock</th>
                       <th>Cost</th>
                       <th>Service price</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -655,10 +697,13 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                           </td>
                           <td style={{ fontSize: '0.9rem' }}>{peso(p.cost_price)}</td>
                           <td style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>{peso(p.service_price)}</td>
+                          <td>
+                            <RowDelete label={`Delete ${p.part_name}`} onClick={() => deletePart(p)} />
+                          </td>
                         </tr>
                       );
                     })}
-                    <EmptyRow span={7} show={filteredParts.length === 0} text="No parts logged yet. Use “Add / restock part”." />
+                    <EmptyRow span={8} show={filteredParts.length === 0} text="No parts logged yet. Use “Add / restock part”." />
                   </tbody>
                 </table>
               </div>
@@ -668,14 +713,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
 
         {/* ------------------------------------------------------------------ */}
         {activeTab === 'sales' && (
-          <SalesTab
-            branches={branchNames}
-            gadgets={gadgets}
-            parts={parts}
-            notify={notify}
-            reload={loadAll}
-            defaultBranch={selectedBranch === ALL_BRANCHES ? branchNames[0] ?? '' : selectedBranch}
-          />
+          <SalesTab gadgets={gadgets} parts={parts} notify={notify} reload={loadAll} />
         )}
 
         {/* ------------------------------------------------------------------ */}
@@ -1205,6 +1243,22 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
 /* ========================================================================== */
 /* Small presentational helpers                                               */
 /* ========================================================================== */
+
+/** The one destructive control in a table row: quiet until you hover it. */
+function RowDelete({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      className="btn btn-secondary"
+      style={{ padding: '6px 8px', color: 'var(--color-danger)' }}
+    >
+      <Trash2 size={15} />
+    </button>
+  );
+}
 
 function MetricTile({
   icon,
@@ -1823,16 +1877,32 @@ function TransferModal({
   onSaved: () => void;
   notify: Notify;
 }) {
-  const [source, setSource] = useState(branches[0] ?? '');
-  const [dest, setDest] = useState(branches[1] ?? '');
   const [itemType, setItemType] = useState<ItemType>('Serialized');
   const [refId, setRefId] = useState('');
   const [qty, setQty] = useState('1');
   const [dispatcher, setDispatcher] = useState('');
+  const [dest, setDest] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Everything that can actually move, whichever store holds it. Asking for a
+  // source branch first only ever produced an empty item list when the guess
+  // was wrong; the item already knows where it is, so read it off the item.
+  const movable =
+    itemType === 'Serialized'
+      ? gadgets.filter((g) => g.status === 'In Stock')
+      : parts.filter((p) => p.stock_qty > 0);
+
+  const chosenGadget = itemType === 'Serialized' ? gadgets.find((g) => g.imei_1 === refId) : undefined;
+  const chosenPart = itemType === 'Bulk' ? parts.find((p) => p.sku === refId) : undefined;
+  const source = chosenGadget?.current_branch ?? chosenPart?.branch_location ?? '';
+  const destinations = branches.filter((b) => b !== source);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!source) {
+      notify('err', 'Choose what is being sent first.');
+      return;
+    }
     if (source === dest) {
       notify('err', 'Source and destination must be different branches.');
       return;
@@ -1895,63 +1965,70 @@ function TransferModal({
     onSaved();
   };
 
-  const sourceStock =
-    itemType === 'Serialized'
-      ? gadgets.filter((g) => g.current_branch === source && g.status === 'In Stock')
-      : parts.filter((p) => p.branch_location === source && p.stock_qty > 0);
-
   return (
     <Modal title="Dispatch branch transfer" width={520} onClose={onClose}>
       <form onSubmit={submit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Source branch *">
-            <select className="form-input" value={source} onChange={(e) => setSource(e.target.value)} required>
-              {branches.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Destination branch *">
-            <select className="form-input" value={dest} onChange={(e) => setDest(e.target.value)} required>
-              {branches.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-
-        <Field label="Item category *">
+        <Field label="Sending a *">
           <select
             className="form-input"
             value={itemType}
             onChange={(e) => {
               setItemType(e.target.value as ItemType);
               setRefId('');
+              setDest('');
             }}
           >
-            <option value="Serialized">Serialized device (by IMEI)</option>
-            <option value="Bulk">Bulk part / accessory (by SKU)</option>
+            <option value="Serialized">Phone / tablet</option>
+            <option value="Bulk">Accessory / part</option>
           </select>
         </Field>
 
-        <Field label={itemType === 'Serialized' ? 'Device in stock at source *' : 'Part in stock at source *'}>
-          <select className="form-input" value={refId} onChange={(e) => setRefId(e.target.value)} required>
-            <option value="">— choose item —</option>
+        <Field label={itemType === 'Serialized' ? 'Which phone *' : 'Which part *'}>
+          <select
+            className="form-input"
+            value={refId}
+            onChange={(e) => {
+              setRefId(e.target.value);
+              setDest('');
+            }}
+            required
+          >
+            <option value="">{itemType === 'Serialized' ? 'Choose a phone…' : 'Choose a part…'}</option>
             {itemType === 'Serialized'
-              ? (sourceStock as RetailGadget[]).map((g) => (
+              ? (movable as RetailGadget[]).map((g) => (
                   <option key={g.item_id} value={g.imei_1}>
-                    {g.brand} {g.model} · {g.color} · {g.imei_1}
+                    {g.brand} {g.model} · {g.color} · {g.current_branch} · {g.imei_1}
                   </option>
                 ))
-              : (sourceStock as RepairPart[]).map((p) => (
+              : (movable as RepairPart[]).map((p) => (
                   <option key={p.part_id} value={p.sku}>
-                    {p.part_name} · {p.sku} · stock {p.stock_qty}
+                    {p.part_name} · {p.branch_location} · {p.stock_qty} on hand
                   </option>
                 ))}
+          </select>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
+            {movable.length === 0
+              ? 'Nothing available to send yet.'
+              : source
+                ? `Currently at ${source}.`
+                : 'The store it is leaving is filled in for you.'}
+          </div>
+        </Field>
+
+        <Field label="Send it to *">
+          <select
+            className="form-input"
+            value={dest}
+            onChange={(e) => setDest(e.target.value)}
+            disabled={!source}
+            required
+          >
+            <option value="">{source ? 'Choose a store…' : 'Choose an item first'}</option>
+            {destinations.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
           </select>
         </Field>
 
@@ -1961,8 +2038,14 @@ function TransferModal({
           </Field>
         )}
 
-        <Field label="Dispatcher name *">
-          <input className="form-input" value={dispatcher} onChange={(e) => setDispatcher(e.target.value)} required />
+        <Field label="Released by *">
+          <input
+            className="form-input"
+            placeholder="Who is handing it over"
+            value={dispatcher}
+            onChange={(e) => setDispatcher(e.target.value)}
+            required
+          />
         </Field>
 
         <ModalActions onCancel={onClose} busy={busy} submitLabel="Dispatch" />
@@ -1976,21 +2059,16 @@ function TransferModal({
 /* ========================================================================== */
 
 function SalesTab({
-  branches,
   gadgets,
   parts,
   notify,
   reload,
-  defaultBranch,
 }: {
-  branches: string[];
   gadgets: RetailGadget[];
   parts: RepairPart[];
   notify: Notify;
   reload: () => Promise<void>;
-  defaultBranch: string;
 }) {
-  const [branch, setBranch] = useState(defaultBranch);
   const [mode, setMode] = useState<'device' | 'accessory'>('device');
   const [imei, setImei] = useState('');
   const [partId, setPartId] = useState('');
@@ -2006,8 +2084,14 @@ function SalesTab({
     no: string;
   } | null>(null);
 
-  const branchDevices = gadgets.filter((g) => g.current_branch === branch && g.status === 'In Stock');
-  const branchParts = parts.filter((p) => p.branch_location === branch && p.stock_qty > 0);
+  // Asking which register you are on, then showing only that store's stock,
+  // meant a cashier holding a phone from another branch got an empty list and
+  // no explanation. Sell what is actually sellable anywhere, and read the
+  // branch off the unit — it is the unit that knows where it lives.
+  const branchDevices = gadgets.filter((g) => g.status === 'In Stock');
+  const branchParts = parts.filter((p) => p.stock_qty > 0);
+  const sellingDevice = branchDevices.find((g) => g.imei_1 === imei);
+  const sellingPart = branchParts.find((p) => p.part_id === partId);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2016,7 +2100,7 @@ function SalesTab({
       if (mode === 'device') {
         const g = branchDevices.find((x) => x.imei_1 === imei);
         if (!g) {
-          notify('err', `No In Stock device with IMEI ${imei} at ${branch}.`);
+          notify('err', `No In Stock device with IMEI ${imei}.`);
           return;
         }
         const { error } = await supabase.from('retail_gadgets').update({ status: 'Sold' }).eq('item_id', g.item_id);
@@ -2026,7 +2110,7 @@ function SalesTab({
         }
         setInvoice({
           type: 'Serialized device sale',
-          branch,
+          branch: g.current_branch,
           item: `${g.brand} ${g.model} (${g.color}, ${g.storage})`,
           identifier: `IMEI: ${g.imei_1}`,
           total: Number(g.retail_price),
@@ -2042,7 +2126,7 @@ function SalesTab({
           return;
         }
         if (p.stock_qty < n) {
-          notify('err', `Only ${p.stock_qty} left at ${branch}.`);
+          notify('err', `Only ${p.stock_qty} left at ${p.branch_location}.`);
           return;
         }
         const { error } = await supabase
@@ -2055,7 +2139,7 @@ function SalesTab({
         }
         setInvoice({
           type: 'Accessory / parts sale',
-          branch,
+          branch: p.branch_location,
           item: p.part_name,
           identifier: `SKU: ${p.sku} × ${n}`,
           total: Number(p.service_price) * n,
@@ -2076,19 +2160,11 @@ function SalesTab({
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 30 }}>
       <div className="glass-panel" style={{ padding: 24 }}>
         <h2>Issue customer invoice</h2>
-        <p style={{ marginBottom: 20 }}>Stock is deducted from the selected branch the moment you confirm.</p>
+        <p style={{ marginBottom: 20 }}>
+          Pick what the customer is buying. Stock is deducted from the store that holds it.
+        </p>
 
         <form onSubmit={submit}>
-          <Field label="Sales register branch *">
-            <select className="form-input" value={branch} onChange={(e) => setBranch(e.target.value)} required>
-              {branches.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </Field>
-
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
             <button
               type="button"
@@ -2109,32 +2185,39 @@ function SalesTab({
           </div>
 
           {mode === 'device' ? (
-            <Field label="Device in stock *">
+            <Field label="Which phone *">
               <select className="form-input" value={imei} onChange={(e) => setImei(e.target.value)} required>
-                <option value="">— scan or choose IMEI —</option>
+                <option value="">Choose a phone…</option>
                 {branchDevices.map((g) => (
                   <option key={g.item_id} value={g.imei_1}>
-                    {g.brand} {g.model} · {g.color} · {g.imei_1} · {peso(g.retail_price)}
+                    {g.brand} {g.model} · {g.color} · {peso(g.retail_price)} · {g.current_branch} · {g.imei_1}
                   </option>
                 ))}
               </select>
-              {branchDevices.length === 0 && (
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                  No devices in stock at {branch}.
-                </div>
-              )}
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                {branchDevices.length === 0
+                  ? 'No phones in stock at any store yet.'
+                  : sellingDevice
+                    ? `Selling from ${sellingDevice.current_branch}.`
+                    : `${branchDevices.length} phone${branchDevices.length === 1 ? '' : 's'} in stock across all stores.`}
+              </div>
             </Field>
           ) : (
             <>
-              <Field label="Accessory / part *">
+              <Field label="Which accessory / part *">
                 <select className="form-input" value={partId} onChange={(e) => setPartId(e.target.value)} required>
-                  <option value="">— choose item —</option>
+                  <option value="">Choose an item…</option>
                   {branchParts.map((p) => (
                     <option key={p.part_id} value={p.part_id}>
-                      {p.part_name} · {p.sku} · stock {p.stock_qty} · {peso(p.service_price)}
+                      {p.part_name} · {peso(p.service_price)} · {p.branch_location} · {p.stock_qty} on hand
                     </option>
                   ))}
                 </select>
+                {sellingPart && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                    Selling from {sellingPart.branch_location}.
+                  </div>
+                )}
               </Field>
               <Field label="Quantity *">
                 <input className="form-input" type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} required />

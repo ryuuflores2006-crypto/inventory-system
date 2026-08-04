@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
@@ -19,6 +20,7 @@ import com.ryuuflores2006.inventorysystem.data.BranchStore
 import com.ryuuflores2006.inventorysystem.data.LiveStore
 import com.ryuuflores2006.inventorysystem.data.RepairPart
 import com.ryuuflores2006.inventorysystem.data.RetailGadget
+import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.ui.components.*
 import com.ryuuflores2006.inventorysystem.ui.theme.*
 import kotlinx.coroutines.launch
@@ -210,6 +212,15 @@ fun GadgetItemCard(gadget: RetailGadget) {
             DetailRow("Margin", peso(gadget.retail_price - gadget.cost_price), Emerald)
             gadget.supplier_name?.takeIf { it.isNotBlank() }?.let { DetailRow("Supplier", it) }
             DetailRow("Received", shortStamp(gadget.created_at))
+            RemoveRow(
+                what = "${gadget.brand} ${gadget.model}",
+                detail = "IMEI ${gadget.imei_1}",
+                blocked = when (gadget.status) {
+                    "Sold", "In Transit" -> "A ${gadget.status.lowercase()} unit cannot be deleted."
+                    else -> null
+                },
+                onConfirm = { SupabaseHelper.deleteGadget(gadget) }
+            )
         } else {
             Text(
                 "IMEI ${gadget.imei_1}",
@@ -269,6 +280,73 @@ fun PartItemCard(part: RepairPart) {
             DetailRow("Margin", peso(part.service_price - part.cost_price), Emerald)
             DetailRow("Reorder at", part.minimum_stock_threshold.toString())
             DetailRow("Added", shortStamp(part.created_at))
+            RemoveRow(
+                what = part.part_name,
+                detail = "${part.sku} at ${part.branch_location}",
+                blocked = null,
+                onConfirm = { SupabaseHelper.deletePart(part) }
+            )
         }
+    }
+}
+
+/**
+ * The delete affordance, kept behind the expanded card so it takes a
+ * deliberate tap to reach and a second one to mean it. [blocked] states why
+ * a row cannot go instead of hiding the button and leaving people guessing.
+ */
+@Composable
+private fun RemoveRow(
+    what: String,
+    detail: String,
+    blocked: String?,
+    onConfirm: suspend () -> String?
+) {
+    val scope = rememberCoroutineScope()
+    var asking by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    HorizontalDivider(color = Ink500, modifier = Modifier.padding(vertical = 8.dp))
+
+    if (blocked != null) {
+        Text(blocked, style = MaterialTheme.typography.bodySmall, color = Ash)
+        return
+    }
+
+    error?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, color = Rose)
+    }
+
+    TextButton(onClick = { asking = true }, enabled = !busy) {
+        Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = Rose)
+        Spacer(Modifier.width(6.dp))
+        Text("Remove from inventory", color = Rose)
+    }
+
+    if (asking) {
+        AlertDialog(
+            onDismissRequest = { if (!busy) asking = false },
+            title = { Text("Remove $what?") },
+            text = { Text("$detail will be deleted for good, on every device.") },
+            confirmButton = {
+                TextButton(
+                    enabled = !busy,
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            val failure = onConfirm()
+                            busy = false
+                            asking = false
+                            error = failure
+                            if (failure == null) LiveStore.refresh()
+                        }
+                    }
+                ) { Text("Delete", color = Rose) }
+            },
+            dismissButton = {
+                TextButton(onClick = { asking = false }, enabled = !busy) { Text("Keep") }
+            }
+        )
     }
 }

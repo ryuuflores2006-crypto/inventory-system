@@ -168,6 +168,46 @@ object SupabaseHelper {
         }
     }
 
+    /**
+     * Remove a unit that should never have been logged — a mis-typed IMEI at
+     * intake, a duplicate.
+     *
+     * Only stock that has not done anything yet can go: a sold or in-transit
+     * unit is part of the day's numbers, and deleting it would quietly rewrite
+     * them. Those are refused here with a reason rather than at the database,
+     * so the message means something to whoever is holding the phone.
+     */
+    suspend fun deleteGadget(gadget: RetailGadget): String? = withContext(Dispatchers.IO) {
+        val id = gadget.item_id ?: return@withContext "This unit has not finished saving yet."
+        if (gadget.status == "Sold" || gadget.status == "In Transit") {
+            return@withContext "Cannot delete a unit that is ${gadget.status}."
+        }
+        try {
+            postgrest["retail_gadgets"].delete { filter { eq("item_id", id) } }
+            null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            e.message ?: "Could not delete this unit."
+        }
+    }
+
+    /** Same idea for a bulk line. The database refuses one a repair consumed. */
+    suspend fun deletePart(part: RepairPart): String? = withContext(Dispatchers.IO) {
+        val id = part.part_id ?: return@withContext "This part has not finished saving yet."
+        try {
+            postgrest["repair_parts"].delete { filter { eq("part_id", id) } }
+            null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            val msg = e.message ?: "Could not delete this part."
+            if (msg.contains("violates foreign key", true)) {
+                "This part has been used on a repair — it cannot be deleted."
+            } else {
+                msg
+            }
+        }
+    }
+
     // --- Repair Parts Service ---
     suspend fun getAllParts(branch: String? = null): List<RepairPart> = withContext(Dispatchers.IO) {
         try {
