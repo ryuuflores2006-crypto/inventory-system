@@ -2,10 +2,22 @@ package com.ryuuflores2006.inventorysystem.data
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Branches are rows, not a fixed enum — they can be added or renamed at runtime
+ * from this app or the PC dashboard, and every other table references the name.
+ */
 @Serializable
-enum class BranchLocation {
-    BranchA, BranchB, BranchC
-}
+data class Branch(
+    val branch_id: String? = null,
+    val name: String,
+    val code: String? = null,
+    val address: String? = null,
+    val phone: String? = null,
+    val is_main: Boolean = false,
+    val is_active: Boolean = true,
+    val created_at: String? = null,
+    val updated_at: String? = null
+)
 
 @Serializable
 enum class GadgetStatus {

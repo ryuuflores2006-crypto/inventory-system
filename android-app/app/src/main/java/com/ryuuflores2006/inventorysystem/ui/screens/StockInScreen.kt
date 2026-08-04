@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ryuuflores2006.inventorysystem.data.BranchStore
 import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.data.RetailGadget
 import com.ryuuflores2006.inventorysystem.data.RepairPart
@@ -26,7 +27,15 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     val scrollState = rememberScrollState()
 
     var isSerialized by remember { mutableStateOf(true) }
-    var selectedBranch by remember { mutableStateOf("Branch A") }
+    var selectedBranch by remember { mutableStateOf("") }
+
+    // Branches come from the database, not a hardcoded list.
+    LaunchedEffect(Unit) {
+        if (BranchStore.branches.isEmpty()) BranchStore.refresh()
+    }
+    LaunchedEffect(BranchStore.branches) {
+        if (selectedBranch !in BranchStore.names) selectedBranch = BranchStore.defaultName
+    }
 
     // Fields for Serialized Track
     var sku by remember { mutableStateOf("") }
@@ -72,14 +81,17 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground)
             ) {
-                Text("Receiving Branch: $selectedBranch")
+                Text(
+                    if (selectedBranch.isBlank()) "Receiving Branch: none yet — add one first"
+                    else "Receiving Branch: $selectedBranch"
+                )
             }
             DropdownMenu(
                 expanded = branchExpanded,
                 onDismissRequest = { branchExpanded = false },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                listOf("Branch A", "Branch B", "Branch C").forEach { loc ->
+                BranchStore.names.forEach { loc ->
                     DropdownMenuItem(
                         text = { Text(loc) },
                         onClick = {
@@ -207,11 +219,10 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 label = { Text("IMEI 2 (Optional)") },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
-            DropdownField(
+            OutlinedTextField(
                 value = supplierName,
                 onValueChange = { supplierName = it },
-                label = "Supplier Name",
-                options = listOf("Apple Distribution Asia", "Samsung Philippines", "Xiaomi Official", "Local Supplier"),
+                label = { Text("Supplier Name (Optional)") },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
         } else {
@@ -268,6 +279,10 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
 
         Button(
             onClick = {
+                if (selectedBranch.isBlank()) {
+                    Toast.makeText(context, "Add a branch first (Branches tab)", Toast.LENGTH_LONG).show()
+                    return@Button
+                }
                 if (sku.isBlank()) {
                     Toast.makeText(context, "SKU is required", Toast.LENGTH_SHORT).show()
                     return@Button

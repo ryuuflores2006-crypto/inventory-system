@@ -1,833 +1,522 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Smartphone, 
-  Wrench, 
-  Truck, 
-  TrendingUp, 
-  Search, 
-  Plus, 
-  Check, 
-  X, 
-  Coins, 
-  Database, 
-  MapPin, 
-  User, 
-  RefreshCw, 
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  Smartphone,
+  Wrench,
+  Truck,
+  TrendingUp,
+  Search,
+  Plus,
+  Coins,
+  Database,
+  MapPin,
+  User,
+  RefreshCw,
   FileText,
   AlertTriangle,
-  Layers,
+  Store,
   ArrowRightLeft,
-  DollarSign
+  DollarSign,
+  LogOut,
+  Star,
+  Archive,
+  Pencil,
 } from 'lucide-react';
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import AuthGate from '@/components/AuthGate';
+import Modal from '@/components/Modal';
+import {
+  ALL_BRANCHES,
+  GADGET_STATUSES,
+  TICKET_STATUSES,
+  peso,
+  type Branch,
+  type BranchTransfer,
+  type ItemType,
+  type RepairPart,
+  type RetailGadget,
+  type ServiceTicket,
+  type TicketPartsUsed,
+  type TicketStatus,
+} from '@/lib/types';
 
-// Types corresponding to Supabase tables
-type BranchLocation = 'Branch A' | 'Branch B' | 'Branch C';
-type GadgetStatus = 'In Stock' | 'Reserved' | 'Sold' | 'In Transit' | 'Returned';
-type TicketStatus = 'Pending' | 'Diagnosing' | 'Waiting for Parts' | 'Repairing' | 'Ready' | 'Completed';
-type TransferStatus = 'In Transit' | 'Received' | 'Cancelled';
+type Tab = 'inventory' | 'sales' | 'repairs' | 'transfers' | 'branches' | 'analytics';
+type Toast = { kind: 'ok' | 'err'; text: string };
 
-interface RetailGadget {
-  item_id: string;
-  sku: string;
-  brand: string;
-  model: string;
-  storage: string;
-  ram: string;
-  color: string;
-  cost_price: number;
-  retail_price: number;
-  current_branch: BranchLocation;
-  status: GadgetStatus;
-  imei_1: string;
-  imei_2?: string;
-  supplier_name?: string;
-  created_at: string;
+export default function Page() {
+  return <AuthGate>{(session, signOut) => <Dashboard session={session} signOut={signOut} />}</AuthGate>;
 }
 
-interface RepairPart {
-  part_id: string;
-  sku: string;
-  part_name: string;
-  compatible_models: string[];
-  branch_location: BranchLocation;
-  stock_qty: number;
-  minimum_stock_threshold: number;
-  cost_price: number;
-  service_price: number;
-  created_at: string;
-}
-
-interface ServiceTicket {
-  ticket_id: string;
-  customer_name: string;
-  phone_number: string;
-  device_model: string;
-  imei_serial: string;
-  issue_description: string;
-  assigned_technician?: string;
-  ticket_status: TicketStatus;
-  labor_cost: number;
-  total_amount: number;
-  branch_location: BranchLocation;
-  created_at: string;
-  updated_at: string;
-}
-
-interface TicketPartsUsed {
-  ticket_part_id: string;
-  ticket_id: string;
-  part_id: string;
-  quantity_used: number;
-  price_charged: number;
-  created_at: string;
-}
-
-interface BranchTransfer {
-  transfer_id: string;
-  source_branch: BranchLocation;
-  destination_branch: BranchLocation;
-  item_type: 'Serialized' | 'Bulk';
-  reference_identifier: string; // IMEI or SKU
-  quantity: number;
-  dispatcher: string;
-  receiver?: string;
-  transfer_status: TransferStatus;
-  created_at: string;
-  updated_at: string;
-}
-
-// Initial Mock Seed Data for Fallback
-const mockGadgets: RetailGadget[] = [
-  { item_id: 'g1', sku: 'SKU-IPH15P-256', brand: 'Apple', model: 'iPhone 15 Pro', storage: '256GB', ram: '8GB', color: 'Natural Titanium', cost_price: 950.00, retail_price: 1199.00, current_branch: 'Branch A', status: 'In Stock', imei_1: '358912345678901', imei_2: '358912345678902', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
-  { item_id: 'g2', sku: 'SKU-IPH15P-256', brand: 'Apple', model: 'iPhone 15 Pro', storage: '256GB', ram: '8GB', color: 'Blue Titanium', cost_price: 950.00, retail_price: 1199.00, current_branch: 'Branch B', status: 'In Stock', imei_1: '358912345678903', imei_2: '358912345678904', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
-  { item_id: 'g3', sku: 'SKU-SAM-S24U-512', brand: 'Samsung', model: 'Galaxy S24 Ultra', storage: '512GB', ram: '12GB', color: 'Titanium Black', cost_price: 1100.00, retail_price: 1399.00, current_branch: 'Branch C', status: 'In Stock', imei_1: '358912345678905', imei_2: '358912345678906', supplier_name: 'Samsung Philippines', created_at: new Date().toISOString() },
-  { item_id: 'g4', sku: 'SKU-SAM-S24U-512', brand: 'Samsung', model: 'Galaxy S24 Ultra', storage: '512GB', ram: '12GB', color: 'Titanium Gray', cost_price: 1100.00, retail_price: 1399.00, current_branch: 'Branch A', status: 'Sold', imei_1: '358912345678907', imei_2: '358912345678908', supplier_name: 'Samsung Philippines', created_at: new Date().toISOString() },
-  { item_id: 'g5', sku: 'SKU-IPH14-128', brand: 'Apple', model: 'iPhone 14', storage: '128GB', ram: '6GB', color: 'Midnight', cost_price: 650.00, retail_price: 799.00, current_branch: 'Branch B', status: 'Sold', imei_1: '358912345678909', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
-  { item_id: 'g6', sku: 'SKU-IPH15P-256', brand: 'Apple', model: 'iPhone 15 Pro', storage: '256GB', ram: '8GB', color: 'Black Titanium', cost_price: 950.00, retail_price: 1199.00, current_branch: 'Branch A', status: 'In Transit', imei_1: '358912345678910', imei_2: '358912345678911', supplier_name: 'Apple Distribution Asia', created_at: new Date().toISOString() },
-  { item_id: 'g7', sku: 'SKU-SAM-A55-128', brand: 'Samsung', model: 'Galaxy A55 5G', storage: '128GB', ram: '8GB', color: 'Awesome Lilac', cost_price: 300.00, retail_price: 399.00, current_branch: 'Branch C', status: 'In Stock', imei_1: '358912345678912', imei_2: '358912345678913', supplier_name: 'Samsung Philippines', created_at: new Date().toISOString() },
-];
-
-const mockParts: RepairPart[] = [
-  { part_id: 'p1', sku: 'PART-IPH15P-SCR', part_name: 'iPhone 15 Pro OLED Screen Replacement', compatible_models: ['iPhone 15 Pro'], branch_location: 'Branch A', stock_qty: 11, minimum_stock_threshold: 3, cost_price: 180.00, service_price: 299.00, created_at: new Date().toISOString() },
-  { part_id: 'p2', sku: 'PART-IPH15P-SCR', part_name: 'iPhone 15 Pro OLED Screen Replacement', compatible_models: ['iPhone 15 Pro'], branch_location: 'Branch B', stock_qty: 4, minimum_stock_threshold: 3, cost_price: 180.00, service_price: 299.00, created_at: new Date().toISOString() },
-  { part_id: 'p3', sku: 'PART-IPH15P-SCR', part_name: 'iPhone 15 Pro OLED Screen Replacement', compatible_models: ['iPhone 15 Pro'], branch_location: 'Branch C', stock_qty: 2, minimum_stock_threshold: 3, cost_price: 180.00, service_price: 299.00, created_at: new Date().toISOString() },
-  { part_id: 'p4', sku: 'PART-S24U-BATT', part_name: 'Samsung Galaxy S24 Ultra Battery 5000mAh', compatible_models: ['Galaxy S24 Ultra', 'SM-S928B'], branch_location: 'Branch A', stock_qty: 15, minimum_stock_threshold: 5, cost_price: 35.00, service_price: 75.00, created_at: new Date().toISOString() },
-  { part_id: 'p5', sku: 'PART-S24U-BATT', part_name: 'Samsung Galaxy S24 Ultra Battery 5000mAh', compatible_models: ['Galaxy S24 Ultra', 'SM-S928B'], branch_location: 'Branch B', stock_qty: 6, minimum_stock_threshold: 5, cost_price: 35.00, service_price: 75.00, created_at: new Date().toISOString() },
-  { part_id: 'p6', sku: 'PART-GEN-PORT', part_name: 'Universal Type-C Charging Port Board v3', compatible_models: ['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], branch_location: 'Branch A', stock_qty: 30, minimum_stock_threshold: 10, cost_price: 8.00, service_price: 25.00, created_at: new Date().toISOString() },
-  { part_id: 'p7', sku: 'PART-GEN-PORT', part_name: 'Universal Type-C Charging Port Board v3', compatible_models: ['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], branch_location: 'Branch C', stock_qty: 8, minimum_stock_threshold: 10, cost_price: 8.00, service_price: 25.00, created_at: new Date().toISOString() },
-  { part_id: 'p8', sku: 'ACC-SCR-PROT', part_name: '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', compatible_models: ['iPhone 15', 'iPhone 15 Pro'], branch_location: 'Branch A', stock_qty: 120, minimum_stock_threshold: 20, cost_price: 1.50, service_price: 10.00, created_at: new Date().toISOString() },
-  { part_id: 'p9', sku: 'ACC-SCR-PROT', part_name: '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', compatible_models: ['iPhone 15', 'iPhone 15 Pro'], branch_location: 'Branch B', stock_qty: 45, minimum_stock_threshold: 20, cost_price: 1.50, service_price: 10.00, created_at: new Date().toISOString() }
-];
-
-const mockTickets: ServiceTicket[] = [
-  { ticket_id: 't1', customer_name: 'John Doe', phone_number: '+639171234567', device_model: 'iPhone 15 Pro', imei_serial: '358912345678901', issue_description: 'Shattered screen from dropping. Screen completely black.', assigned_technician: 'Alex Cruz', ticket_status: 'Repairing', labor_cost: 50.00, total_amount: 349.00, branch_location: 'Branch A', created_at: new Date(Date.now() - 86400000).toISOString(), updated_at: new Date().toISOString() },
-  { ticket_id: 't2', customer_name: 'Maria Santos', phone_number: '+639189876543', device_model: 'Galaxy S24 Ultra', imei_serial: '358912345678905', issue_description: 'Battery draining rapidly, device gets hot while charging.', assigned_technician: 'Benjie Diaz', ticket_status: 'Pending', labor_cost: 30.00, total_amount: 30.00, branch_location: 'Branch B', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { ticket_id: 't3', customer_name: 'Gabriel Reyes', phone_number: '+639205554433', device_model: 'iPhone 14', imei_serial: '358912345678909', issue_description: 'Clean speaker grills and check charging port connection.', assigned_technician: undefined, ticket_status: 'Diagnosing', labor_cost: 15.00, total_amount: 15.00, branch_location: 'Branch A', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { ticket_id: 't4', customer_name: 'Sarah Lee', phone_number: '+639998887766', device_model: 'Xiaomi 13 Pro', imei_serial: '864239857392812', issue_description: 'Replace cracked back glass panel.', assigned_technician: 'Alex Cruz', ticket_status: 'Completed', labor_cost: 40.00, total_amount: 40.00, branch_location: 'Branch A', created_at: new Date(Date.now() - 172800000).toISOString(), updated_at: new Date().toISOString() }
-];
-
-const mockTransfers: BranchTransfer[] = [
-  { transfer_id: 'tr1', source_branch: 'Branch A', destination_branch: 'Branch B', item_type: 'Serialized', reference_identifier: '358912345678910', quantity: 1, dispatcher: 'Mark Manager', receiver: undefined, transfer_status: 'In Transit', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { transfer_id: 'tr2', source_branch: 'Branch A', destination_branch: 'Branch C', item_type: 'Bulk', reference_identifier: 'PART-GEN-PORT', quantity: 5, dispatcher: 'Mark Manager', receiver: 'Rene Technician', transfer_status: 'Received', created_at: new Date(Date.now() - 86400000).toISOString(), updated_at: new Date().toISOString() }
-];
-
-const mockTicketParts: TicketPartsUsed[] = [
-  { ticket_part_id: 'tp1', ticket_id: 't1', part_id: 'p1', quantity_used: 1, price_charged: 299.00, created_at: new Date().toISOString() }
-];
-
-export default function Dashboard() {
-  // Navigation & Filtering
-  const [activeTab, setActiveTab] = useState<'inventory' | 'sales' | 'repairs' | 'transfers' | 'analytics'>('inventory');
-  const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  
-  // Database States
-  const [gadgets, setGadgets] = useState<RetailGadget[]>(mockGadgets);
-  const [parts, setParts] = useState<RepairPart[]>(mockParts);
-  const [tickets, setTickets] = useState<ServiceTicket[]>(mockTickets);
-  const [transfers, setTransfers] = useState<BranchTransfer[]>(mockTransfers);
-  const [ticketPartsUsed, setTicketPartsUsed] = useState<TicketPartsUsed[]>(mockTicketParts);
-
-  const [useLiveSupabase, setUseLiveSupabase] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-
-  // Sub-navigation within Inventory
+function Dashboard({ session, signOut }: { session: Session; signOut: () => Promise<void> }) {
+  const [activeTab, setActiveTab] = useState<Tab>('inventory');
+  const [selectedBranch, setSelectedBranch] = useState<string>(ALL_BRANCHES);
+  const [searchQuery, setSearchQuery] = useState('');
   const [inventorySubTab, setInventorySubTab] = useState<'serialized' | 'bulk'>('serialized');
 
-  const exportToCSV = (data: any[], filename: string) => {
-    if (data.length === 0) {
-      alert('No data to export.');
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [gadgets, setGadgets] = useState<RetailGadget[]>([]);
+  const [parts, setParts] = useState<RepairPart[]>([]);
+  const [tickets, setTickets] = useState<ServiceTicket[]>([]);
+  const [transfers, setTransfers] = useState<BranchTransfer[]>([]);
+  const [ticketPartsUsed, setTicketPartsUsed] = useState<TicketPartsUsed[]>([]);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
+
+  const notify = useCallback((kind: Toast['kind'], text: string) => {
+    setToast({ kind, text });
+    window.setTimeout(() => setToast(null), 5000);
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // Data loading
+  // -------------------------------------------------------------------------
+  const loadAll = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    const [bRes, gRes, pRes, tRes, trRes, tpRes] = await Promise.all([
+      supabase.from('branches').select('*').order('is_main', { ascending: false }).order('name'),
+      supabase.from('retail_gadgets').select('*').order('created_at', { ascending: false }),
+      supabase.from('repair_parts').select('*').order('part_name'),
+      supabase.from('service_tickets').select('*').order('created_at', { ascending: false }),
+      supabase.from('branch_transfers').select('*').order('created_at', { ascending: false }),
+      supabase.from('ticket_parts_used').select('*'),
+    ]);
+
+    const firstError = [bRes, gRes, pRes, tRes, trRes, tpRes].find((r) => r.error)?.error;
+    if (firstError) {
+      setLoadError(firstError.message);
+    } else {
+      setBranches((bRes.data ?? []) as Branch[]);
+      setGadgets((gRes.data ?? []) as RetailGadget[]);
+      setParts((pRes.data ?? []) as RepairPart[]);
+      setTickets((tRes.data ?? []) as ServiceTicket[]);
+      setTransfers((trRes.data ?? []) as BranchTransfer[]);
+      setTicketPartsUsed((tpRes.data ?? []) as TicketPartsUsed[]);
+    }
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  // Live sync across devices (phone stock-in shows up on the PC instantly)
+  useEffect(() => {
+    const channel = supabase
+      .channel('inventory-sync')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => loadAll())
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadAll]);
+
+  const activeBranches = useMemo(() => branches.filter((b) => b.is_active), [branches]);
+  const branchNames = useMemo(() => activeBranches.map((b) => b.name), [activeBranches]);
+  const hasBranches = branchNames.length > 0;
+
+  // -------------------------------------------------------------------------
+  // Modal state
+  // -------------------------------------------------------------------------
+  const [showBranchModal, setShowBranchModal] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+  const [showDeviceModal, setShowDeviceModal] = useState(false);
+  const [showPartModal, setShowPartModal] = useState(false);
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [allocateTarget, setAllocateTarget] = useState<ServiceTicket | null>(null);
+
+  // -------------------------------------------------------------------------
+  // Derived lists
+  // -------------------------------------------------------------------------
+  const q = searchQuery.trim().toLowerCase();
+  const matchBranch = (name: string) => selectedBranch === ALL_BRANCHES || name === selectedBranch;
+
+  const filteredGadgets = useMemo(
+    () =>
+      gadgets.filter(
+        (g) =>
+          matchBranch(g.current_branch) &&
+          (!q ||
+            g.imei_1?.includes(q) ||
+            g.sku.toLowerCase().includes(q) ||
+            g.model.toLowerCase().includes(q) ||
+            g.brand.toLowerCase().includes(q))
+      ),
+    [gadgets, selectedBranch, q]
+  );
+
+  const filteredParts = useMemo(
+    () =>
+      parts.filter(
+        (p) =>
+          matchBranch(p.branch_location) &&
+          (!q || p.sku.toLowerCase().includes(q) || p.part_name.toLowerCase().includes(q))
+      ),
+    [parts, selectedBranch, q]
+  );
+
+  const filteredTickets = useMemo(
+    () =>
+      tickets.filter(
+        (t) =>
+          matchBranch(t.branch_location) &&
+          (!q ||
+            t.customer_name.toLowerCase().includes(q) ||
+            t.imei_serial.includes(q) ||
+            t.device_model.toLowerCase().includes(q))
+      ),
+    [tickets, selectedBranch, q]
+  );
+
+  const filteredTransfers = useMemo(
+    () =>
+      transfers.filter(
+        (t) =>
+          selectedBranch === ALL_BRANCHES ||
+          t.source_branch === selectedBranch ||
+          t.destination_branch === selectedBranch
+      ),
+    [transfers, selectedBranch]
+  );
+
+  const stats = useMemo(() => {
+    const scopedGadgets = gadgets.filter((g) => matchBranch(g.current_branch));
+    const scopedTickets = tickets.filter((t) => matchBranch(t.branch_location));
+    const scopedParts = parts.filter((p) => matchBranch(p.branch_location));
+
+    const ticketRev = scopedTickets
+      .filter((t) => t.ticket_status === 'Completed')
+      .reduce((s, t) => s + Number(t.total_amount), 0);
+    const deviceRev = scopedGadgets
+      .filter((g) => g.status === 'Sold')
+      .reduce((s, g) => s + Number(g.retail_price), 0);
+
+    return {
+      inStock: scopedGadgets.filter((g) => g.status === 'In Stock').length,
+      activeRepairs: scopedTickets.filter((t) => t.ticket_status !== 'Completed').length,
+      lowStock: scopedParts.filter((p) => p.stock_qty <= p.minimum_stock_threshold).length,
+      revenue: ticketRev + deviceRev,
+    };
+  }, [gadgets, tickets, parts, selectedBranch]);
+
+  // -------------------------------------------------------------------------
+  // Mutations
+  // -------------------------------------------------------------------------
+  const run = async (label: string, fn: () => PromiseLike<{ error: { message: string } | null }>) => {
+    const { error } = await fn();
+    if (error) {
+      notify('err', `${label} failed: ${error.message}`);
+      return false;
+    }
+    notify('ok', `${label} saved.`);
+    await loadAll();
+    return true;
+  };
+
+  const exportToCSV = <T extends object>(rows: T[], filename: string) => {
+    if (rows.length === 0) {
+      notify('err', 'Nothing to export yet.');
       return;
     }
-    const headers = Object.keys(data[0]).join(',');
-    const csvRows = data.map(row => 
-      Object.values(row).map(value => 
-        typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value
-      ).join(',')
-    );
-    const csvContent = [headers, ...csvRows].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
+    const headers = Object.keys(rows[0]);
+    const escape = (v: unknown) =>
+      v == null ? '' : `"${String(Array.isArray(v) ? v.join('; ') : v).replace(/"/g, '""')}"`;
+    const csv = [
+      headers.join(','),
+      ...rows.map((r) => headers.map((h) => escape((r as Record<string, unknown>)[h])).join(',')),
+    ].join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
-    document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    URL.revokeObjectURL(url);
   };
 
-  // Modals / Workflows States
-  const [showAllocatePartModal, setShowAllocatePartModal] = useState<boolean>(false);
-  const [selectedTicketForPart, setSelectedTicketForPart] = useState<ServiceTicket | null>(null);
-  
-  // Allocate Part Selection State
-  const [selectedPartIdToAllocate, setSelectedPartIdToAllocate] = useState<string>('');
-  const [allocateQty, setAllocateQty] = useState<number>(1);
-
-  // Dispatch Transfer Modal / Form State
-  const [showTransferModal, setShowTransferModal] = useState<boolean>(false);
-  const [transferSource, setTransferSource] = useState<BranchLocation>('Branch A');
-  const [transferDest, setTransferDest] = useState<BranchLocation>('Branch B');
-  const [transferItemType, setTransferItemType] = useState<'Serialized' | 'Bulk'>('Serialized');
-  const [transferRefId, setTransferRefId] = useState<string>(''); // IMEI or SKU
-  const [transferQty, setTransferQty] = useState<number>(1);
-  const [transferDispatcher, setTransferDispatcher] = useState<string>('Manager Counter');
-
-  // Sales / Stock-Out Form States
-  const [saleBranch, setSaleBranch] = useState<BranchLocation>('Branch A');
-  const [saleImei, setSaleImei] = useState<string>('');
-  const [salePartSku, setSalePartSku] = useState<string>('');
-  const [salePartQty, setSalePartQty] = useState<number>(1);
-  const [recentInvoice, setRecentInvoice] = useState<any>(null);
-
-  // Test Supabase Connection on Mount
-  useEffect(() => {
-    async function checkConnection() {
-      try {
-        const { data, error } = await supabase.from('retail_gadgets').select('count', { count: 'exact', head: true });
-        if (!error) {
-          setUseLiveSupabase(true);
-          fetchRealData();
-        }
-      } catch (e) {
-        console.log("Using Mock Database mode: offline/local execution active.");
-      }
-    }
-    checkConnection();
-  }, []);
-
-  // Fetch real data from Supabase
-  const fetchRealData = async () => {
-    setIsLoading(true);
-    try {
-      const [gRes, pRes, tRes, trRes, tpRes] = await Promise.all([
-        supabase.from('retail_gadgets').select('*'),
-        supabase.from('repair_parts').select('*'),
-        supabase.from('service_tickets').select('*'),
-        supabase.from('branch_transfers').select('*'),
-        supabase.from('ticket_parts_used').select('*')
-      ]);
-
-      if (gRes.data) setGadgets(gRes.data as RetailGadget[]);
-      if (pRes.data) setParts(pRes.data as RepairPart[]);
-      if (tRes.data) setTickets(tRes.data as ServiceTicket[]);
-      if (trRes.data) setTransfers(trRes.data as BranchTransfer[]);
-      if (tpRes.data) setTicketPartsUsed(tpRes.data as TicketPartsUsed[]);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Helper: Increment / decrement stock in both DB and local fallback state
-  const handleRetailSale = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (saleImei) {
-      // Serialized track
-      const gadget = gadgets.find(g => g.imei_1 === saleImei && g.current_branch === saleBranch);
-      if (!gadget) {
-        alert(`Error: Unique IMEI ${saleImei} not found in stock at ${saleBranch}!`);
-        return;
-      }
-      if (gadget.status !== 'In Stock') {
-        alert(`Error: Device is currently ${gadget.status}. Only "In Stock" devices can be sold.`);
-        return;
-      }
-
-      if (useLiveSupabase) {
-        const { error } = await supabase
-          .from('retail_gadgets')
-          .update({ status: 'Sold' })
-          .eq('imei_1', saleImei);
-        if (error) {
-          alert('Database error during sale processing.');
-          return;
-        }
-      }
-
-      // Update State
-      setGadgets(prev => prev.map(g => g.imei_1 === saleImei ? { ...g, status: 'Sold' as GadgetStatus } : g));
-      setRecentInvoice({
-        type: 'Serialized Device Sale',
-        branch: saleBranch,
-        item: `${gadget.brand} ${gadget.model} (${gadget.color})`,
-        identifier: `IMEI: ${saleImei}`,
-        total: gadget.retail_price,
-        timestamp: new Date().toLocaleTimeString(),
-        invoiceNo: `INV-${Math.floor(100000 + Math.random() * 900000)}`
-      });
-      setSaleImei('');
-    } else if (salePartSku && salePartQty > 0) {
-      // Bulk track
-      const part = parts.find(p => p.sku === salePartSku && p.branch_location === saleBranch);
-      if (!part) {
-        alert(`Error: Part/Accessory SKU ${salePartSku} not found in stock at ${saleBranch}!`);
-        return;
-      }
-      if (part.stock_qty < salePartQty) {
-        alert(`Error: Insufficient stock at ${saleBranch}! Available: ${part.stock_qty}, Requested: ${salePartQty}`);
-        return;
-      }
-
-      if (useLiveSupabase) {
-        const { error } = await supabase
-          .from('repair_parts')
-          .update({ stock_qty: part.stock_qty - salePartQty })
-          .eq('part_id', part.part_id);
-        if (error) {
-          alert('Database error during bulk deduction.');
-          return;
-        }
-      }
-
-      // Update State
-      setParts(prev => prev.map(p => p.part_id === part.part_id ? { ...p, stock_qty: p.stock_qty - salePartQty } : p));
-      setRecentInvoice({
-        type: 'Bulk Accessory Sale',
-        branch: saleBranch,
-        item: part.part_name,
-        identifier: `SKU: ${salePartSku} (Qty: ${salePartQty})`,
-        total: part.service_price * salePartQty,
-        timestamp: new Date().toLocaleTimeString(),
-        invoiceNo: `INV-${Math.floor(100000 + Math.random() * 900000)}`
-      });
-      setSalePartSku('');
-      setSalePartQty(1);
-    } else {
-      alert('Please fill out device IMEI or Accessory SKU.');
-    }
-  };
-
-  // Helper: Allocate repair parts to service tickets
-  const handleAllocatePartSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTicketForPart || !selectedPartIdToAllocate) return;
-
-    const part = parts.find(p => p.part_id === selectedPartIdToAllocate);
-    if (!part) return;
-
-    if (part.stock_qty < allocateQty) {
-      alert('Error: Insufficient stock available to allocate to this ticket!');
-      return;
-    }
-
-    if (useLiveSupabase) {
-      // Insert to junction table. Trigger automatically handles:
-      // 1. Subtracting stock level in repair_parts
-      // 2. Adjusting total cost in service_tickets
-      const { error } = await supabase
-        .from('ticket_parts_used')
-        .insert({
-          ticket_id: selectedTicketForPart.ticket_id,
-          part_id: selectedPartIdToAllocate,
-          quantity_used: allocateQty,
-          price_charged: part.service_price
-        });
-      if (error) {
-        alert(`Error inserting parts allocation: ${error.message}`);
-        return;
-      }
-      fetchRealData();
-    } else {
-      // Mock Local State Workflow
-      const totalPartCost = part.service_price * allocateQty;
-      // Deduct stock quantity
-      setParts(prev => prev.map(p => p.part_id === selectedPartIdToAllocate ? { ...p, stock_qty: p.stock_qty - allocateQty } : p));
-      // Add junction row
-      const newJunction: TicketPartsUsed = {
-        ticket_part_id: `tp-${Date.now()}`,
-        ticket_id: selectedTicketForPart.ticket_id,
-        part_id: selectedPartIdToAllocate,
-        quantity_used: allocateQty,
-        price_charged: part.service_price,
-        created_at: new Date().toISOString()
-      };
-      setTicketPartsUsed(prev => [...prev, newJunction]);
-      // Update ticket total
-      setTickets(prev => prev.map(t => t.ticket_id === selectedTicketForPart.ticket_id ? {
-        ...t,
-        total_amount: t.total_amount + totalPartCost
-      } : t));
-    }
-
-    setShowAllocatePartModal(false);
-    setSelectedPartIdToAllocate('');
-    setAllocateQty(1);
-    alert('Part allocated successfully! Repair invoice updated.');
-  };
-
-  // Helper: Dispatch Branch-to-Branch Stock Transfers
-  const handleDispatchTransfer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (transferSource === transferDest) {
-      alert('Source branch and destination branch must be different.');
-      return;
-    }
-
-    if (transferItemType === 'Serialized') {
-      const gadget = gadgets.find(g => g.imei_1 === transferRefId && g.current_branch === transferSource);
-      if (!gadget) {
-        alert(`Error: Serialized device ${transferRefId} not in stock at source: ${transferSource}`);
-        return;
-      }
-      if (gadget.status !== 'In Stock') {
-        alert(`Error: Gadget status is currently ${gadget.status}. Transfer requires "In Stock" status.`);
-        return;
-      }
-
-      if (useLiveSupabase) {
-        // Create transfer log & update status to 'In Transit'
-        const { error } = await supabase.from('branch_transfers').insert({
-          source_branch: transferSource,
-          destination_branch: transferDest,
-          item_type: 'Serialized',
-          reference_identifier: transferRefId,
-          quantity: 1,
-          dispatcher: transferDispatcher,
-          transfer_status: 'In Transit'
-        });
-        const { error: error2 } = await supabase.from('retail_gadgets').update({ status: 'In Transit' }).eq('imei_1', transferRefId);
-        if (error || error2) {
-          alert('Database transaction failed.');
-          return;
-        }
-        fetchRealData();
-      } else {
-        // Mock Update
-        setGadgets(prev => prev.map(g => g.imei_1 === transferRefId ? { ...g, status: 'In Transit' } : g));
-        const newTrans: BranchTransfer = {
-          transfer_id: `tr-${Date.now()}`,
-          source_branch: transferSource,
-          destination_branch: transferDest,
-          item_type: 'Serialized',
-          reference_identifier: transferRefId,
-          quantity: 1,
-          dispatcher: transferDispatcher,
-          transfer_status: 'In Transit',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        setTransfers(prev => [newTrans, ...prev]);
-      }
-    } else {
-      // Bulk transfer
-      const part = parts.find(p => p.sku === transferRefId && p.branch_location === transferSource);
-      if (!part || part.stock_qty < transferQty) {
-        alert(`Error: Insufficient parts at source. Stock available: ${part ? part.stock_qty : 0}`);
-        return;
-      }
-
-      if (useLiveSupabase) {
-        const { error } = await supabase.from('branch_transfers').insert({
-          source_branch: transferSource,
-          destination_branch: transferDest,
-          item_type: 'Bulk',
-          reference_identifier: transferRefId,
-          quantity: transferQty,
-          dispatcher: transferDispatcher,
-          transfer_status: 'In Transit'
-        });
-        const { error: error2 } = await supabase.from('repair_parts').update({ stock_qty: part.stock_qty - transferQty }).eq('part_id', part.part_id);
-        if (error || error2) {
-          alert('Database transaction failed.');
-          return;
-        }
-        fetchRealData();
-      } else {
-        // Mock Update: Deduct quantity immediately from source
-        setParts(prev => prev.map(p => p.part_id === part.part_id ? { ...p, stock_qty: p.stock_qty - transferQty } : p));
-        const newTrans: BranchTransfer = {
-          transfer_id: `tr-${Date.now()}`,
-          source_branch: transferSource,
-          destination_branch: transferDest,
-          item_type: 'Bulk',
-          reference_identifier: transferRefId,
-          quantity: transferQty,
-          dispatcher: transferDispatcher,
-          transfer_status: 'In Transit',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        setTransfers(prev => [newTrans, ...prev]);
-      }
-    }
-
-    setShowTransferModal(false);
-    setTransferRefId('');
-    setTransferQty(1);
-    alert('Transfer successfully dispatched! Item status updated to "In Transit".');
-  };
-
-  // Helper: Approve/Receive Branch Transfer at destination
-  const handleReceiveTransfer = async (transfer: BranchTransfer, receiverName: string) => {
-    if (useLiveSupabase) {
-      // Update transfer status
-      const { error } = await supabase
-        .from('branch_transfers')
-        .update({ transfer_status: 'Received', receiver: receiverName, updated_at: new Date().toISOString() })
-        .eq('transfer_id', transfer.transfer_id);
-
-      if (transfer.item_type === 'Serialized') {
-        // Relocate gadget and set status back to 'In Stock'
-        await supabase
-          .from('retail_gadgets')
-          .update({ current_branch: transfer.destination_branch, status: 'In Stock' })
-          .eq('imei_1', transfer.reference_identifier);
-      } else {
-        // Bulk items: Check if item already exists at destination, else insert
-        const { data: destPart } = await supabase
-          .from('repair_parts')
-          .select('*')
-          .eq('sku', transfer.reference_identifier)
-          .eq('branch_location', transfer.destination_branch)
-          .single();
-
-        if (destPart) {
-          await supabase
-            .from('repair_parts')
-            .update({ stock_qty: destPart.stock_qty + transfer.quantity })
-            .eq('part_id', destPart.part_id);
-        } else {
-          // Fetch parent template details from source
-          const { data: sourcePart } = await supabase
-            .from('repair_parts')
-            .select('*')
-            .eq('sku', transfer.reference_identifier)
-            .eq('branch_location', transfer.source_branch)
-            .single();
-
-          if (sourcePart) {
-            await supabase.from('repair_parts').insert({
-              sku: transfer.reference_identifier,
-              part_name: sourcePart.part_name,
-              compatible_models: sourcePart.compatible_models,
-              branch_location: transfer.destination_branch,
-              stock_qty: transfer.quantity,
-              minimum_stock_threshold: sourcePart.minimum_stock_threshold,
-              cost_price: sourcePart.cost_price,
-              service_price: sourcePart.service_price
-            });
-          }
-        }
-      }
-      fetchRealData();
-    } else {
-      // Mock Receive Workflow
-      setTransfers(prev => prev.map(t => t.transfer_id === transfer.transfer_id ? { ...t, transfer_status: 'Received', receiver: receiverName } : t));
-      if (transfer.item_type === 'Serialized') {
-        setGadgets(prev => prev.map(g => g.imei_1 === transfer.reference_identifier ? { ...g, current_branch: transfer.destination_branch, status: 'In Stock' } : g));
-      } else {
-        const existingPart = parts.find(p => p.sku === transfer.reference_identifier && p.branch_location === transfer.destination_branch);
-        if (existingPart) {
-          setParts(prev => prev.map(p => p.part_id === existingPart.part_id ? { ...p, stock_qty: p.stock_qty + transfer.quantity } : p));
-        } else {
-          const srcPart = parts.find(p => p.sku === transfer.reference_identifier && p.branch_location === transfer.source_branch);
-          if (srcPart) {
-            const newPart: RepairPart = {
-              part_id: `p-${Date.now()}`,
-              sku: transfer.reference_identifier,
-              part_name: srcPart.part_name,
-              compatible_models: srcPart.compatible_models,
-              branch_location: transfer.destination_branch,
-              stock_qty: transfer.quantity,
-              minimum_stock_threshold: srcPart.minimum_stock_threshold,
-              cost_price: srcPart.cost_price,
-              service_price: srcPart.service_price,
-              created_at: new Date().toISOString()
-            };
-            setParts(prev => [...prev, newPart]);
-          }
-        }
-      }
-    }
-    alert('Shipment verified! Inventory locations and stock quantities updated successfully.');
-  };
-
-  // Helper: Update Service Ticket status
-  const handleUpdateTicketStatus = async (ticketId: string, nextStatus: TicketStatus) => {
-    if (useLiveSupabase) {
-      await supabase.from('service_tickets').update({ ticket_status: nextStatus }).eq('ticket_id', ticketId);
-      fetchRealData();
-    } else {
-      setTickets(prev => prev.map(t => t.ticket_id === ticketId ? { ...t, ticket_status: nextStatus } : t));
-    }
-  };
-
-  // Filters computed lists
-  const filteredGadgets = useMemo(() => {
-    return gadgets.filter(g => {
-      const matchBranch = selectedBranch === 'All Branches' || g.current_branch === selectedBranch;
-      const matchSearch = g.imei_1.includes(searchQuery) || g.sku.toLowerCase().includes(searchQuery.toLowerCase()) || g.model.toLowerCase().includes(searchQuery.toLowerCase()) || g.brand.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchBranch && matchSearch;
-    });
-  }, [gadgets, selectedBranch, searchQuery]);
-
-  const filteredParts = useMemo(() => {
-    return parts.filter(p => {
-      const matchBranch = selectedBranch === 'All Branches' || p.branch_location === selectedBranch;
-      const matchSearch = p.sku.toLowerCase().includes(searchQuery.toLowerCase()) || p.part_name.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchBranch && matchSearch;
-    });
-  }, [parts, selectedBranch, searchQuery]);
-
-  const filteredTickets = useMemo(() => {
-    return tickets.filter(t => {
-      const matchBranch = selectedBranch === 'All Branches' || t.branch_location === selectedBranch;
-      const matchSearch = t.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) || t.imei_serial.includes(searchQuery) || t.device_model.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchBranch && matchSearch;
-    });
-  }, [tickets, selectedBranch, searchQuery]);
-
-  const filteredTransfers = useMemo(() => {
-    return transfers.filter(t => {
-      return selectedBranch === 'All Branches' || t.source_branch === selectedBranch || t.destination_branch === selectedBranch;
-    });
-  }, [transfers, selectedBranch]);
-
-  // Statistics Summary
-  const stats = useMemo(() => {
-    const totalDevicesCount = gadgets.filter(g => g.status === 'In Stock').length;
-    const activeRepairsCount = tickets.filter(t => t.ticket_status !== 'Completed').length;
-    const lowStockAlertCount = parts.filter(p => p.stock_qty <= p.minimum_stock_threshold).length;
-    
-    // Revenue calculations (completed repairs + sold devices)
-    const completedTicketRev = tickets.filter(t => t.ticket_status === 'Completed').reduce((sum, t) => sum + Number(t.total_amount), 0);
-    const deviceSaleRev = gadgets.filter(g => g.status === 'Sold').reduce((sum, g) => sum + Number(g.retail_price), 0);
-    const totalRevenue = completedTicketRev + deviceSaleRev;
-
-    return {
-      totalDevicesCount,
-      activeRepairsCount,
-      lowStockAlertCount,
-      totalRevenue
-    };
-  }, [gadgets, tickets, parts]);
-
-  // Parts list filter for allocating to specific branch
-  const availablePartsForAllocation = useMemo(() => {
-    if (!selectedTicketForPart) return [];
-    return parts.filter(p => p.branch_location === selectedTicketForPart.branch_location && p.stock_qty > 0);
-  }, [parts, selectedTicketForPart]);
-
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
   return (
     <div className="layout-container">
-      {/* Sidebar Navigation */}
       <aside className="sidebar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px' }}>
-          <div style={{ padding: '8px', background: 'rgba(6, 182, 212, 0.1)', borderRadius: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+          <div style={{ padding: 8, background: 'rgba(6,182,212,0.1)', borderRadius: 10 }}>
             <Wrench size={24} color="#06b6d4" />
           </div>
           <div>
-            <span style={{ fontSize: '1.2rem', fontWeight: '800', color: '#fff', letterSpacing: '0.5px' }}>ANTIGRAVITY</span>
-            <div style={{ fontSize: '0.7rem', color: '#06b6d4', fontWeight: 'bold' }}>MULTI-STORE CRM</div>
+            <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff', letterSpacing: '0.5px' }}>
+              REPAIR &amp; RETAIL
+            </span>
+            <div style={{ fontSize: '0.7rem', color: '#06b6d4', fontWeight: 'bold' }}>MULTI-BRANCH CRM</div>
           </div>
         </div>
 
-        {/* Global Branch Filter Selector */}
-        <div style={{ marginBottom: '24px' }}>
-          <label className="form-label">Active Store Filter</label>
-          <div style={{ position: 'relative' }}>
-            <select 
-              value={selectedBranch} 
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              className="form-input"
-              style={{ paddingRight: '30px', cursor: 'pointer', appearance: 'none', background: 'rgba(255,255,255,0.04)' }}
+        <div style={{ marginBottom: 22 }}>
+          <label className="form-label">Active store filter</label>
+          <select
+            value={selectedBranch}
+            onChange={(e) => setSelectedBranch(e.target.value)}
+            className="form-input"
+            style={{ cursor: 'pointer' }}
+          >
+            <option value={ALL_BRANCHES}>All Branches (Global)</option>
+            {activeBranches.map((b) => (
+              <option key={b.branch_id} value={b.name}>
+                {b.name}
+                {b.is_main ? ' ★' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {(
+            [
+              ['inventory', Database, 'Inventory Audit'],
+              ['sales', Coins, 'Retail Sales Cashier'],
+              ['repairs', Wrench, 'Repair Tickets Queue'],
+              ['transfers', Truck, 'Branch Transfers'],
+              ['branches', Store, 'Branch Manager'],
+              ['analytics', TrendingUp, 'Sales & Revenue'],
+            ] as [Tab, typeof Database, string][]
+          ).map(([key, Icon, label]) => (
+            <button
+              key={key}
+              className={`btn ${activeTab === key ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ width: '100%', justifyContent: 'flex-start' }}
+              onClick={() => setActiveTab(key)}
             >
-              <option value="All Branches">All Branches (Global)</option>
-              <option value="Branch A">Branch A</option>
-              <option value="Branch B">Branch B</option>
-              <option value="Branch C">Branch C</option>
-            </select>
-            <div style={{ position: 'absolute', right: '12px', top: '13px', pointerEvents: 'none', width: '0', height: '0', borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--text-muted)' }}></div>
-          </div>
-        </div>
-
-        {/* Navigation Links */}
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <button 
-            className={`btn ${activeTab === 'inventory' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ width: '100%', justifyContent: 'flex-start' }}
-            onClick={() => setActiveTab('inventory')}
-          >
-            <Database size={18} />
-            Inventory Audit
-          </button>
-          <button 
-            className={`btn ${activeTab === 'sales' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ width: '100%', justifyContent: 'flex-start' }}
-            onClick={() => setActiveTab('sales')}
-          >
-            <Coins size={18} />
-            Retail Sales Cashier
-          </button>
-          <button 
-            className={`btn ${activeTab === 'repairs' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ width: '100%', justifyContent: 'flex-start' }}
-            onClick={() => setActiveTab('repairs')}
-          >
-            <Wrench size={18} />
-            Repair Tickets Queue
-          </button>
-          <button 
-            className={`btn ${activeTab === 'transfers' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ width: '100%', justifyContent: 'flex-start' }}
-            onClick={() => setActiveTab('transfers')}
-          >
-            <Truck size={18} />
-            Branch Transfers
-          </button>
-          <button 
-            className={`btn ${activeTab === 'analytics' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ width: '100%', justifyContent: 'flex-start' }}
-            onClick={() => setActiveTab('analytics')}
-          >
-            <TrendingUp size={18} />
-            Sales &amp; Revenue
-          </button>
+              <Icon size={18} />
+              {label}
+            </button>
+          ))}
         </nav>
 
-        {/* Database Status Indicator */}
-        <div style={{ marginTop: 'auto', padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: useLiveSupabase ? 'var(--color-success)' : 'var(--color-warning)' }}></div>
-          <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>{useLiveSupabase ? 'Supabase Centralized' : 'Offline Mock DB'}</div>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{useLiveSupabase ? 'Real-time synchronization active' : 'Local memory testing active'}</div>
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div
+            style={{
+              padding: 12,
+              borderRadius: 12,
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid var(--border-color)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: loadError ? 'var(--color-danger)' : 'var(--color-success)',
+                }}
+              />
+              <div style={{ overflow: 'hidden' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
+                  {loadError ? 'Connection problem' : 'Supabase live'}
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.65rem',
+                    color: 'var(--text-muted)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                  title={session.user.email ?? ''}
+                >
+                  {session.user.email}
+                </div>
+              </div>
+            </div>
           </div>
+          <button className="btn btn-secondary" style={{ width: '100%' }} onClick={signOut}>
+            <LogOut size={16} />
+            Sign out
+          </button>
         </div>
       </aside>
 
-      {/* Main Dashboard Panel */}
       <main className="main-content">
-        
-        {/* Dynamic Header Metrics Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-          
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ padding: '12px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '12px' }}>
-              <DollarSign size={24} color="var(--color-success)" />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Cumulative Revenue</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: '800' }}>₱{stats.totalRevenue.toLocaleString()}</div>
+        {toast && (
+          <div
+            className={`badge ${toast.kind === 'ok' ? 'badge-success' : 'badge-danger'}`}
+            style={{ display: 'block', padding: '12px 16px', marginBottom: 16 }}
+          >
+            {toast.text}
+          </div>
+        )}
+
+        {loadError && (
+          <div className="glass-panel" style={{ padding: 20, marginBottom: 20, borderColor: 'var(--color-danger)' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <AlertTriangle size={22} color="var(--color-danger)" />
+              <div>
+                <strong>Could not read the database.</strong>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                  {loadError} — make sure <code>supabase/schema.sql</code> has been run on the project.
+                </div>
+              </div>
             </div>
           </div>
+        )}
 
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ padding: '12px', background: 'rgba(6, 182, 212, 0.1)', borderRadius: '12px' }}>
-              <Smartphone size={24} color="var(--color-primary)" />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Serialized Phones</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: '800' }}>{stats.totalDevicesCount} in stock</div>
-            </div>
+        {!isLoading && !loadError && !hasBranches && (
+          <div className="glass-panel" style={{ padding: 24, marginBottom: 20, textAlign: 'center' }}>
+            <Store size={36} color="var(--color-primary)" />
+            <h2 style={{ marginTop: 12 }}>No branches yet</h2>
+            <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
+              Add your first store to start logging stock, repairs and transfers.
+            </p>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setEditingBranch(null);
+                setShowBranchModal(true);
+              }}
+            >
+              <Plus size={16} /> Add branch
+            </button>
           </div>
+        )}
 
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px' }}>
-              <Wrench size={24} color="var(--color-info)" />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Active Repairs</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: '800' }}>{stats.activeRepairsCount} jobs</div>
-            </div>
-          </div>
-
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '12px' }}>
-              <AlertTriangle size={24} color="var(--color-danger)" />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Low Stock Items</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: '800', color: stats.lowStockAlertCount > 0 ? 'var(--color-danger)' : 'inherit' }}>{stats.lowStockAlertCount} alerts</div>
-            </div>
-          </div>
-
+        {/* Metric tiles */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 20,
+            marginBottom: 28,
+          }}
+        >
+          <MetricTile icon={<DollarSign size={24} color="var(--color-success)" />} tint="16,185,129" label="Cumulative revenue" value={peso(stats.revenue)} />
+          <MetricTile icon={<Smartphone size={24} color="var(--color-primary)" />} tint="6,182,212" label="Serialized phones" value={`${stats.inStock} in stock`} />
+          <MetricTile icon={<Wrench size={24} color="var(--color-info)" />} tint="59,130,246" label="Active repairs" value={`${stats.activeRepairs} jobs`} />
+          <MetricTile
+            icon={<AlertTriangle size={24} color="var(--color-danger)" />}
+            tint="239,68,68"
+            label="Low stock items"
+            value={`${stats.lowStock} alerts`}
+            danger={stats.lowStock > 0}
+          />
         </div>
 
-        {/* Global Toolbar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+        {/* Toolbar */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 16,
+            marginBottom: 24,
+          }}
+        >
           <div>
             <h1>
               {activeTab === 'inventory' && 'Central Master Audit'}
               {activeTab === 'sales' && 'Counter Cashier Terminal'}
               {activeTab === 'repairs' && 'Service Repairs Intake Queue'}
               {activeTab === 'transfers' && 'Multi-Store Branch Transfers'}
+              {activeTab === 'branches' && 'Branch Manager'}
               {activeTab === 'analytics' && 'Operational Revenue Reports'}
             </h1>
-            <p>Managing inventory across branches: Manila, Cebu, Davao</p>
+            <p>
+              {selectedBranch === ALL_BRANCHES
+                ? `Managing ${activeBranches.length} branch${activeBranches.length === 1 ? '' : 'es'}`
+                : `Scoped to ${selectedBranch}`}
+            </p>
           </div>
 
-          {/* Quick Search Panel */}
-          {activeTab !== 'analytics' && activeTab !== 'sales' && (
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '6px 14px', width: '320px' }}>
-              <Search size={18} color="var(--text-muted)" />
-              <input 
-                type="text" 
-                placeholder="Search inventory SKU, model, client..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ border: 'none', background: 'transparent', outline: 'none', color: '#fff', fontSize: '0.9rem', width: '100%' }}
-              />
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            {activeTab !== 'analytics' && activeTab !== 'sales' && activeTab !== 'branches' && (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'center',
+                  background: 'rgba(0,0,0,0.2)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 10,
+                  padding: '6px 14px',
+                  width: 300,
+                }}
+              >
+                <Search size={18} color="var(--text-muted)" />
+                <input
+                  type="text"
+                  placeholder="Search SKU, IMEI, model, client…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    outline: 'none',
+                    color: '#fff',
+                    fontSize: '0.9rem',
+                    width: '100%',
+                  }}
+                />
+              </div>
+            )}
+            <button className="btn btn-secondary" onClick={loadAll} disabled={isLoading} title="Refresh">
+              <RefreshCw size={16} className={isLoading ? 'spin' : undefined} />
+            </button>
+          </div>
         </div>
 
-        {/* TAB CONTENT: INVENTORY AUDIT */}
+        {/* ------------------------------------------------------------------ */}
         {activeTab === 'inventory' && (
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button 
+          <div className="glass-panel" style={{ padding: 24 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 12,
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
                   className={`btn ${inventorySubTab === 'serialized' ? 'btn-primary' : 'btn-secondary'}`}
                   onClick={() => setInventorySubTab('serialized')}
                 >
-                  Serialized Phones / Tablets
+                  Serialized phones / tablets
                 </button>
-                <button 
+                <button
                   className={`btn ${inventorySubTab === 'bulk' ? 'btn-primary' : 'btn-secondary'}`}
                   onClick={() => setInventorySubTab('bulk')}
                 >
-                  Accessories &amp; Spare Components
+                  Accessories &amp; spare components
                 </button>
               </div>
-              <button 
-                className="btn btn-outline"
-                onClick={() => {
-                  if (inventorySubTab === 'serialized') {
-                    exportToCSV(gadgets, 'serialized_stock_report.csv');
-                  } else {
-                    exportToCSV(parts, 'bulk_parts_stock_report.csv');
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  className="btn btn-primary"
+                  disabled={!hasBranches}
+                  onClick={() => (inventorySubTab === 'serialized' ? setShowDeviceModal(true) : setShowPartModal(true))}
+                >
+                  <Plus size={16} />
+                  {inventorySubTab === 'serialized' ? 'Add device' : 'Add / restock part'}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() =>
+                    inventorySubTab === 'serialized'
+                      ? exportToCSV(filteredGadgets, 'serialized_stock.csv')
+                      : exportToCSV(filteredParts, 'bulk_parts_stock.csv')
                   }
-                }}
-              >
-                <FileText size={16} style={{ marginRight: '8px' }} />
-                Export / Print CSV
-              </button>
+                >
+                  <FileText size={16} />
+                  Export CSV
+                </button>
+              </div>
             </div>
 
             {inventorySubTab === 'serialized' ? (
@@ -835,53 +524,63 @@ export default function Dashboard() {
                 <table className="custom-table">
                   <thead>
                     <tr>
-                      <th>Model / Variant</th>
+                      <th>Model / variant</th>
                       <th>SKU</th>
-                      <th>Unique IMEI 1 / 2</th>
+                      <th>IMEI 1 / 2</th>
                       <th>Location</th>
                       <th>Supplier</th>
                       <th>Status</th>
                       <th>Cost</th>
-                      <th>Retail Price</th>
+                      <th>Retail</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredGadgets.map((gadget) => (
-                      <tr key={gadget.item_id}>
+                    {filteredGadgets.map((g) => (
+                      <tr key={g.item_id}>
                         <td>
-                          <div style={{ fontWeight: '600' }}>{gadget.brand} {gadget.model}</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{gadget.storage} / {gadget.ram} GB | {gadget.color}</div>
-                        </td>
-                        <td><code style={{ fontSize: '0.85rem' }}>{gadget.sku}</code></td>
-                        <td>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{gadget.imei_1}</div>
-                          {gadget.imei_2 && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{gadget.imei_2}</div>}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
-                            <MapPin size={12} color="var(--color-primary)" />
-                            {gadget.current_branch}
+                          <div style={{ fontWeight: 600 }}>
+                            {g.brand} {g.model}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {g.storage} / {g.ram} | {g.color}
                           </div>
                         </td>
-                        <td style={{ fontSize: '0.85rem' }}>{gadget.supplier_name || 'N/A'}</td>
                         <td>
-                          <span className={`badge ${
-                            gadget.status === 'In Stock' ? 'badge-success' : 
-                            gadget.status === 'Sold' ? 'badge-muted' : 
-                            gadget.status === 'In Transit' ? 'badge-info' : 'badge-warning'
-                          }`}>
-                            {gadget.status}
-                          </span>
+                          <code style={{ fontSize: '0.85rem' }}>{g.sku}</code>
                         </td>
-                        <td style={{ fontSize: '0.9rem' }}>₱{gadget.cost_price.toLocaleString()}</td>
-                        <td style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>₱{gadget.retail_price.toLocaleString()}</td>
+                        <td>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{g.imei_1}</div>
+                          {g.imei_2 && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{g.imei_2}</div>
+                          )}
+                        </td>
+                        <td>
+                          <BranchCell name={g.current_branch} />
+                        </td>
+                        <td style={{ fontSize: '0.85rem' }}>{g.supplier_name || '—'}</td>
+                        <td>
+                          <select
+                            value={g.status}
+                            className="form-input"
+                            style={{ padding: '4px 8px', fontSize: '0.8rem', width: 'auto' }}
+                            onChange={(e) =>
+                              run('Status update', () =>
+                                supabase.from('retail_gadgets').update({ status: e.target.value }).eq('item_id', g.item_id)
+                              )
+                            }
+                          >
+                            {GADGET_STATUSES.map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td style={{ fontSize: '0.9rem' }}>{peso(g.cost_price)}</td>
+                        <td style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>{peso(g.retail_price)}</td>
                       </tr>
                     ))}
-                    {filteredGadgets.length === 0 && (
-                      <tr>
-                        <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>No serialized gadgets match current filter criteria.</td>
-                      </tr>
-                    )}
+                    <EmptyRow span={8} show={filteredGadgets.length === 0} text="No devices logged yet. Use “Add device”." />
                   </tbody>
                 </table>
               </div>
@@ -890,55 +589,48 @@ export default function Dashboard() {
                 <table className="custom-table">
                   <thead>
                     <tr>
-                      <th>Part / Component Name</th>
+                      <th>Part / component</th>
                       <th>SKU</th>
-                      <th>Compatibilities</th>
-                      <th>Store Location</th>
-                      <th>Stock Quantity</th>
+                      <th>Compatibility</th>
+                      <th>Store</th>
+                      <th>Stock</th>
                       <th>Cost</th>
-                      <th>Service List Price</th>
+                      <th>Service price</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredParts.map((part) => {
-                      const isLow = part.stock_qty <= part.minimum_stock_threshold;
+                    {filteredParts.map((p) => {
+                      const low = p.stock_qty <= p.minimum_stock_threshold;
                       return (
-                        <tr key={part.part_id}>
+                        <tr key={p.part_id}>
+                          <td style={{ fontWeight: 600 }}>{p.part_name}</td>
                           <td>
-                            <div style={{ fontWeight: '600' }}>{part.part_name}</div>
+                            <code style={{ fontSize: '0.85rem' }}>{p.sku}</code>
                           </td>
-                          <td><code style={{ fontSize: '0.85rem' }}>{part.sku}</code></td>
                           <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            {part.compatible_models.join(', ')}
+                            {p.compatible_models?.join(', ') || '—'}
                           </td>
                           <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
-                              <MapPin size={12} color="var(--color-primary)" />
-                              {part.branch_location}
-                            </div>
+                            <BranchCell name={p.branch_location} />
                           </td>
                           <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontWeight: 'bold', color: isLow ? 'var(--color-danger)' : 'inherit' }}>
-                                {part.stock_qty}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontWeight: 'bold', color: low ? 'var(--color-danger)' : 'inherit' }}>
+                                {p.stock_qty}
                               </span>
-                              {isLow && (
+                              {low && (
                                 <span className="badge badge-danger" style={{ padding: '2px 6px', fontSize: '0.65rem' }}>
-                                  Low Stock Limit: {part.minimum_stock_threshold}
+                                  min {p.minimum_stock_threshold}
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td style={{ fontSize: '0.9rem' }}>₱{part.cost_price.toLocaleString()}</td>
-                          <td style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>₱{part.service_price.toLocaleString()}</td>
+                          <td style={{ fontSize: '0.9rem' }}>{peso(p.cost_price)}</td>
+                          <td style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>{peso(p.service_price)}</td>
                         </tr>
                       );
                     })}
-                    {filteredParts.length === 0 && (
-                      <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>No accessories found matching current branch or search.</td>
-                      </tr>
-                    )}
+                    <EmptyRow span={7} show={filteredParts.length === 0} text="No parts logged yet. Use “Add / restock part”." />
                   </tbody>
                 </table>
               </div>
@@ -946,231 +638,156 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* TAB CONTENT: RETAIL SALES CASHIER */}
+        {/* ------------------------------------------------------------------ */}
         {activeTab === 'sales' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-            
-            <div className="glass-panel" style={{ padding: '24px' }}>
-              <h2>Issue Customer Invoice</h2>
-              <p style={{ marginBottom: '20px' }}>Simulate retail stock-out workflows. Deducts components and cellphones.</p>
-              
-              <form onSubmit={handleRetailSale}>
-                <div className="form-group">
-                  <label className="form-label">Sales Register Branch</label>
-                  <select 
-                    value={saleBranch} 
-                    onChange={(e) => setSaleBranch(e.target.value as BranchLocation)}
-                    className="form-input"
-                  >
-                    <option value="Branch A">Branch A</option>
-                    <option value="Branch B">Branch B</option>
-                    <option value="Branch C">Branch C</option>
-                  </select>
-                </div>
-
-                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '12px', color: 'var(--color-primary)' }}>Track A: Cellphones (Serialized Scan)</h3>
-                  <div className="form-group">
-                    <label className="form-label">Scan Device Unique IMEI (15 Digits)</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. 358912345678901"
-                      value={saleImei}
-                      onChange={(e) => {
-                        setSaleImei(e.target.value);
-                        setSalePartSku('');
-                      }}
-                      className="form-input"
-                    />
-                  </div>
-                </div>
-
-                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '12px', color: 'var(--color-primary)' }}>Track B: Accessories &amp; Bulk Spare Parts</h3>
-                  <div className="form-group">
-                    <label className="form-label">Search Accessory SKU</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. ACC-SCR-PROT"
-                      value={salePartSku}
-                      onChange={(e) => {
-                        setSalePartSku(e.target.value);
-                        setSaleImei('');
-                      }}
-                      className="form-input"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Quantity to Purchase</label>
-                    <input 
-                      type="number" 
-                      min="1"
-                      value={salePartQty}
-                      onChange={(e) => setSalePartQty(parseInt(e.target.value) || 1)}
-                      className="form-input"
-                    />
-                  </div>
-                </div>
-
-                <button type="submit" className="btn btn-primary" style={{ width: '100%', height: '48px' }}>
-                  Confirm Purchase &amp; Deduct Stock
-                </button>
-              </form>
-            </div>
-
-            {/* Generated Invoice View */}
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
-              <h2>Active Receipt Printer</h2>
-              {recentInvoice ? (
-                <div style={{ padding: '24px', background: '#0e1420', border: '1px dashed var(--border-color)', borderRadius: '12px', fontFamily: 'monospace', fontSize: '0.9rem', color: '#a5f3fc', flex: '1', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ textAlign: 'center', borderBottom: '1px dashed rgba(255,255,255,0.1)', paddingBottom: '16px', marginBottom: '16px' }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: '#fff' }}>ANTIGRAVITY RETAIL INC.</div>
-                    <div>Branch: {recentInvoice.branch}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Central Transaction Database</div>
-                  </div>
-                  
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span>Invoice No:</span>
-                    <span style={{ color: '#fff', fontWeight: 'bold' }}>{recentInvoice.invoiceNo}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span>Time Log:</span>
-                    <span>{recentInvoice.timestamp}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span>Transaction Class:</span>
-                    <span>{recentInvoice.type}</span>
-                  </div>
-
-                  <div style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', borderBottom: '1px dashed rgba(255,255,255,0.1)', padding: '16px 0', margin: '16px 0' }}>
-                    <div style={{ fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>Item description:</div>
-                    <div>{recentInvoice.item}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{recentInvoice.identifier}</div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', color: '#fff', marginTop: 'auto' }}>
-                    <span>TOTAL AMOUNT DUE:</span>
-                    <span>₱{recentInvoice.total.toLocaleString()}</span>
-                  </div>
-                  <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '24px' }}>
-                    Inventory adjusted synchronously. Official electronic invoice uploaded to Supabase.
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: '1', border: '2px dashed var(--border-color)', borderRadius: '12px', padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <FileText size={48} style={{ marginBottom: '16px', opacity: '0.5' }} />
-                  <p>Awaiting transaction. Fill out the cash register form to output inventory transaction logs.</p>
-                </div>
-              )}
-            </div>
-
-          </div>
+          <SalesTab
+            branches={branchNames}
+            gadgets={gadgets}
+            parts={parts}
+            notify={notify}
+            reload={loadAll}
+            defaultBranch={selectedBranch === ALL_BRANCHES ? branchNames[0] ?? '' : selectedBranch}
+          />
         )}
 
-        {/* TAB CONTENT: SERVICE TICKETS QUEUE */}
+        {/* ------------------------------------------------------------------ */}
         {activeTab === 'repairs' && (
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2>Repair Tickets &amp; Parts Management</h2>
-              <p>Allocate screen replacements, batteries, etc. from branch stock.</p>
+          <div className="glass-panel" style={{ padding: 24 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 12,
+                marginBottom: 20,
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0 }}>Repair tickets &amp; parts</h2>
+                <p style={{ margin: 0 }}>Allocating a part deducts it from that branch&apos;s stock automatically.</p>
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button className="btn btn-primary" disabled={!hasBranches} onClick={() => setShowTicketModal(true)}>
+                  <Plus size={16} /> New ticket
+                </button>
+                <button className="btn btn-secondary" onClick={() => exportToCSV(filteredTickets, 'repair_tickets.csv')}>
+                  <FileText size={16} /> Export CSV
+                </button>
+              </div>
             </div>
 
             <div className="table-container">
               <table className="custom-table">
                 <thead>
                   <tr>
-                    <th>Ticket ID / Client</th>
-                    <th>Device Details</th>
-                    <th>Reported Issue</th>
+                    <th>Client</th>
+                    <th>Device</th>
+                    <th>Issue</th>
                     <th>Technician</th>
                     <th>Branch</th>
-                    <th>Ticket Status</th>
+                    <th>Status</th>
                     <th>Financials</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTickets.map((ticket) => (
-                    <tr key={ticket.ticket_id}>
+                  {filteredTickets.map((t) => (
+                    <tr key={t.ticket_id}>
                       <td>
-                        <div style={{ fontWeight: '600' }}>{ticket.customer_name}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{ticket.phone_number}</div>
+                        <div style={{ fontWeight: 600 }}>{t.customer_name}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t.phone_number}</div>
                       </td>
                       <td>
-                        <div style={{ fontWeight: '500' }}>{ticket.device_model}</div>
-                        <div style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>IMEI: {ticket.imei_serial}</div>
+                        <div style={{ fontWeight: 500 }}>{t.device_model}</div>
+                        <div style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{t.imei_serial}</div>
                       </td>
-                      <td style={{ fontSize: '0.85rem', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={ticket.issue_description}>
-                        {ticket.issue_description}
+                      <td
+                        style={{
+                          fontSize: '0.85rem',
+                          maxWidth: 200,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={t.issue_description}
+                      >
+                        {t.issue_description}
                       </td>
                       <td>
-                        {ticket.assigned_technician ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
+                        {t.assigned_technician ? (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem' }}>
                             <User size={12} color="var(--color-primary)" />
-                            {ticket.assigned_technician}
-                          </div>
+                            {t.assigned_technician}
+                          </span>
                         ) : (
-                          <span style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--color-danger)' }}>Unassigned</span>
+                          <span style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--color-danger)' }}>
+                            Unassigned
+                          </span>
                         )}
                       </td>
+                      <td style={{ fontSize: '0.85rem' }}>{t.branch_location}</td>
                       <td>
-                        <span style={{ fontSize: '0.85rem' }}>{ticket.branch_location}</span>
-                      </td>
-                      <td>
-                        <select 
-                          value={ticket.ticket_status} 
-                          onChange={(e) => handleUpdateTicketStatus(ticket.ticket_id, e.target.value as TicketStatus)}
+                        <select
+                          value={t.ticket_status}
                           className="form-input"
-                          style={{ padding: '4px 8px', fontSize: '0.8rem', cursor: 'pointer', display: 'inline-block', width: 'auto', background: 'rgba(255,255,255,0.05)' }}
+                          style={{ padding: '4px 8px', fontSize: '0.8rem', width: 'auto' }}
+                          onChange={(e) =>
+                            run('Ticket status', () =>
+                              supabase
+                                .from('service_tickets')
+                                .update({ ticket_status: e.target.value as TicketStatus })
+                                .eq('ticket_id', t.ticket_id)
+                            )
+                          }
                         >
-                          <option value="Pending">Pending</option>
-                          <option value="Diagnosing">Diagnosing</option>
-                          <option value="Waiting for Parts">Waiting for Parts</option>
-                          <option value="Repairing">Repairing</option>
-                          <option value="Ready">Ready</option>
-                          <option value="Completed">Completed</option>
+                          {TICKET_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
                         </select>
                       </td>
                       <td>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Labor: ₱{ticket.labor_cost}</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Total: ₱{ticket.total_amount}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          Labor {peso(t.labor_cost)}
+                        </div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Total {peso(t.total_amount)}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          {ticketPartsUsed.filter((tp) => tp.ticket_id === t.ticket_id).length} part(s) used
+                        </div>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button 
-                            className="btn btn-secondary" 
-                            style={{ padding: '6px 12px', fontSize: '0.75rem' }}
-                            onClick={() => {
-                              setSelectedTicketForPart(ticket);
-                              setShowAllocatePartModal(true);
-                            }}
-                            disabled={ticket.ticket_status === 'Completed'}
-                          >
-                            Allocate Component
-                          </button>
-                        </div>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                          onClick={() => setAllocateTarget(t)}
+                          disabled={t.ticket_status === 'Completed'}
+                        >
+                          Allocate part
+                        </button>
                       </td>
                     </tr>
                   ))}
-                  {filteredTickets.length === 0 && (
-                    <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>No active service tickets found.</td>
-                    </tr>
-                  )}
+                  <EmptyRow span={8} show={filteredTickets.length === 0} text="No repair tickets yet. Use “New ticket”." />
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* TAB CONTENT: BRANCH TRANSFERS */}
+        {/* ------------------------------------------------------------------ */}
         {activeTab === 'transfers' && (
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2>Branch to Branch Logistics Hub</h2>
-              <button className="btn btn-primary" onClick={() => setShowTransferModal(true)}>
-                <Plus size={16} />
-                Dispatch New Transfer
+          <div className="glass-panel" style={{ padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ margin: 0 }}>Branch-to-branch logistics</h2>
+              <button
+                className="btn btn-primary"
+                disabled={branchNames.length < 2}
+                title={branchNames.length < 2 ? 'Add at least two branches first' : undefined}
+                onClick={() => setShowTransferModal(true)}
+              >
+                <Plus size={16} /> Dispatch transfer
               </button>
             </div>
 
@@ -1178,10 +795,10 @@ export default function Dashboard() {
               <table className="custom-table">
                 <thead>
                   <tr>
-                    <th>Transfer ID</th>
+                    <th>Ref</th>
                     <th>Route</th>
                     <th>Type</th>
-                    <th>Identifier / SKU</th>
+                    <th>Identifier</th>
                     <th>Qty</th>
                     <th>Dispatcher</th>
                     <th>Receiver</th>
@@ -1190,87 +807,239 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransfers.map((transfer) => (
-                    <tr key={transfer.transfer_id}>
-                      <td><code style={{ fontSize: '0.85rem' }}>{transfer.transfer_id.substring(0, 8)}...</code></td>
+                  {filteredTransfers.map((t) => (
+                    <tr key={t.transfer_id}>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
-                          <span>{transfer.source_branch}</span>
+                        <code style={{ fontSize: '0.85rem' }}>{t.transfer_id.substring(0, 8)}</code>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
+                          <span>{t.source_branch}</span>
                           <ArrowRightLeft size={12} color="var(--text-muted)" />
-                          <span style={{ fontWeight: '600' }}>{transfer.destination_branch}</span>
+                          <span style={{ fontWeight: 600 }}>{t.destination_branch}</span>
                         </div>
                       </td>
                       <td>
-                        <span className={`badge ${transfer.item_type === 'Serialized' ? 'badge-success' : 'badge-info'}`}>
-                          {transfer.item_type}
+                        <span className={`badge ${t.item_type === 'Serialized' ? 'badge-success' : 'badge-info'}`}>
+                          {t.item_type}
                         </span>
                       </td>
-                      <td><span style={{ fontSize: '0.85rem', fontFamily: 'monospace' }}>{transfer.reference_identifier}</span></td>
-                      <td style={{ fontWeight: 'bold' }}>{transfer.quantity}</td>
-                      <td style={{ fontSize: '0.85rem' }}>{transfer.dispatcher}</td>
-                      <td style={{ fontSize: '0.85rem' }}>{transfer.receiver || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Pending</span>}</td>
+                      <td style={{ fontSize: '0.85rem', fontFamily: 'monospace' }}>{t.reference_identifier}</td>
+                      <td style={{ fontWeight: 'bold' }}>{t.quantity}</td>
+                      <td style={{ fontSize: '0.85rem' }}>{t.dispatcher}</td>
+                      <td style={{ fontSize: '0.85rem' }}>
+                        {t.receiver || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Pending</span>}
+                      </td>
                       <td>
-                        <span className={`badge ${
-                          transfer.transfer_status === 'Received' ? 'badge-success' :
-                          transfer.transfer_status === 'In Transit' ? 'badge-warning' : 'badge-danger'
-                        }`}>
-                          {transfer.transfer_status}
+                        <span
+                          className={`badge ${
+                            t.transfer_status === 'Received'
+                              ? 'badge-success'
+                              : t.transfer_status === 'In Transit'
+                              ? 'badge-warning'
+                              : 'badge-danger'
+                          }`}
+                        >
+                          {t.transfer_status}
                         </span>
                       </td>
                       <td>
-                        {transfer.transfer_status === 'In Transit' && (
-                          <button 
-                            className="btn btn-primary" 
+                        {t.transfer_status === 'In Transit' && (
+                          <button
+                            className="btn btn-primary"
                             style={{ padding: '6px 12px', fontSize: '0.75rem' }}
-                            onClick={() => {
-                              const receiverName = prompt("Enter Receiver Staff Name:") || "Receiving Staff";
-                              handleReceiveTransfer(transfer, receiverName);
+                            onClick={async () => {
+                              const receiver = prompt('Receiver staff name:');
+                              if (!receiver) return;
+                              await run('Transfer receipt', async () =>
+                                supabase.rpc('receive_branch_transfer', {
+                                  p_transfer_id: t.transfer_id,
+                                  p_receiver: receiver,
+                                })
+                              );
                             }}
                           >
-                            Receive &amp; Audit
+                            Receive
                           </button>
                         )}
                       </td>
                     </tr>
                   ))}
-                  {filteredTransfers.length === 0 && (
-                    <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>No branch transfer logs found.</td>
-                    </tr>
-                  )}
+                  <EmptyRow span={9} show={filteredTransfers.length === 0} text="No transfers recorded yet." />
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* TAB CONTENT: ANALYTICS & DAILY REVENUE */}
-        {activeTab === 'analytics' && (
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <h2>Daily Revenue &amp; Store Performance Report</h2>
-            <p style={{ marginBottom: '24px' }}>Aggregated accounting data for Branch A, Branch B, and Branch C branches.</p>
+        {/* ------------------------------------------------------------------ */}
+        {activeTab === 'branches' && (
+          <div className="glass-panel" style={{ padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ margin: 0 }}>Stores</h2>
+                <p style={{ margin: 0 }}>
+                  Add a branch here or from the Android app — both clients read the same list.
+                </p>
+              </div>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setEditingBranch(null);
+                  setShowBranchModal(true);
+                }}
+              >
+                <Plus size={16} /> Add branch
+              </button>
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-              
-              {/* Branch breakdown card */}
-              <div style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '16px', color: 'var(--color-primary)' }}>Sales Distribution by Branch</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {['Branch A', 'Branch B', 'Branch C'].map((branch) => {
-                    // Calculate branch revenue
-                    const ticketRev = tickets.filter(t => t.branch_location === branch && t.ticket_status === 'Completed').reduce((sum, t) => sum + Number(t.total_amount), 0);
-                    const deviceRev = gadgets.filter(g => g.current_branch === branch && g.status === 'Sold').reduce((sum, g) => sum + Number(g.retail_price), 0);
-                    const branchTotal = ticketRev + deviceRev;
-                    const percent = stats.totalRevenue > 0 ? (branchTotal / stats.totalRevenue) * 100 : 0;
-
-                    return (
-                      <div key={branch}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.9rem' }}>
-                          <span>{branch}</span>
-                          <span style={{ fontWeight: 'bold' }}>₱{branchTotal.toLocaleString()} ({percent.toFixed(1)}%)</span>
+            <div className="table-container">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Branch</th>
+                    <th>Code</th>
+                    <th>Address</th>
+                    <th>Phone</th>
+                    <th>Devices</th>
+                    <th>Part lines</th>
+                    <th>Open repairs</th>
+                    <th>State</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {branches.map((b) => (
+                    <tr key={b.branch_id} style={{ opacity: b.is_active ? 1 : 0.5 }}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
+                          {b.is_main && <Star size={13} color="var(--color-warning)" fill="currentColor" />}
+                          {b.name}
                         </div>
-                        <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ width: `${percent}%`, height: '100%', background: 'linear-gradient(95deg, var(--color-primary) 0%, var(--color-info) 100%)', borderRadius: '4px' }}></div>
+                      </td>
+                      <td>
+                        <code style={{ fontSize: '0.85rem' }}>{b.code || '—'}</code>
+                      </td>
+                      <td style={{ fontSize: '0.85rem' }}>{b.address || '—'}</td>
+                      <td style={{ fontSize: '0.85rem' }}>{b.phone || '—'}</td>
+                      <td>{gadgets.filter((g) => g.current_branch === b.name).length}</td>
+                      <td>{parts.filter((p) => p.branch_location === b.name).length}</td>
+                      <td>
+                        {tickets.filter((t) => t.branch_location === b.name && t.ticket_status !== 'Completed').length}
+                      </td>
+                      <td>
+                        <span className={`badge ${b.is_active ? 'badge-success' : 'badge-muted'}`}>
+                          {b.is_active ? 'Active' : 'Archived'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                            onClick={() => {
+                              setEditingBranch(b);
+                              setShowBranchModal(true);
+                            }}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          {!b.is_main && (
+                            <button
+                              className="btn btn-secondary"
+                              style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                              title="Set as main store"
+                              onClick={async () => {
+                                await supabase.from('branches').update({ is_main: false }).eq('is_main', true);
+                                await run('Main store', () =>
+                                  supabase.from('branches').update({ is_main: true }).eq('branch_id', b.branch_id)
+                                );
+                              }}
+                            >
+                              <Star size={13} />
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                            title={b.is_active ? 'Archive branch' : 'Reactivate branch'}
+                            onClick={() =>
+                              run('Branch state', () =>
+                                supabase
+                                  .from('branches')
+                                  .update({ is_active: !b.is_active })
+                                  .eq('branch_id', b.branch_id)
+                              )
+                            }
+                          >
+                            <Archive size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  <EmptyRow span={9} show={branches.length === 0} text="No branches yet." />
+                </tbody>
+              </table>
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 16 }}>
+              Archiving hides a branch from every dropdown but keeps its history. Renaming a branch updates all of its
+              stock, tickets and transfer logs automatically.
+            </p>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------------ */}
+        {activeTab === 'analytics' && (
+          <div className="glass-panel" style={{ padding: 24 }}>
+            <h2>Revenue &amp; store performance</h2>
+            <p style={{ marginBottom: 24 }}>Completed repair invoices plus sold serialized devices.</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 30 }}>
+              <div
+                style={{
+                  padding: 20,
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 12,
+                }}
+              >
+                <h3 style={{ fontSize: '1.1rem', marginBottom: 16, color: 'var(--color-primary)' }}>
+                  Sales distribution by branch
+                </h3>
+                {activeBranches.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No branches yet.</p>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {activeBranches.map((b) => {
+                    const rev =
+                      tickets
+                        .filter((t) => t.branch_location === b.name && t.ticket_status === 'Completed')
+                        .reduce((s, t) => s + Number(t.total_amount), 0) +
+                      gadgets
+                        .filter((g) => g.current_branch === b.name && g.status === 'Sold')
+                        .reduce((s, g) => s + Number(g.retail_price), 0);
+                    const grand =
+                      tickets
+                        .filter((t) => t.ticket_status === 'Completed')
+                        .reduce((s, t) => s + Number(t.total_amount), 0) +
+                      gadgets.filter((g) => g.status === 'Sold').reduce((s, g) => s + Number(g.retail_price), 0);
+                    const pct = grand > 0 ? (rev / grand) * 100 : 0;
+                    return (
+                      <div key={b.branch_id}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: '0.9rem' }}>
+                          <span>{b.name}</span>
+                          <span style={{ fontWeight: 'bold' }}>
+                            {peso(rev)} ({pct.toFixed(1)}%)
+                          </span>
+                        </div>
+                        <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              width: `${pct}%`,
+                              height: '100%',
+                              background: 'linear-gradient(95deg, var(--color-primary), var(--color-info))',
+                            }}
+                          />
                         </div>
                       </div>
                     );
@@ -1278,201 +1047,1153 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Workflow stats summary */}
-              <div style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '16px', color: 'var(--color-primary)' }}>Operational Ticket Summary</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Pending Diagnostic</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '800' }}>
-                      {tickets.filter(t => t.ticket_status === 'Pending' || t.ticket_status === 'Diagnosing').length}
-                    </div>
-                  </div>
-                  <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Waiting for Parts</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--color-warning)' }}>
-                      {tickets.filter(t => t.ticket_status === 'Waiting for Parts').length}
-                    </div>
-                  </div>
-                  <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>In Process (Repairing)</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--color-info)' }}>
-                      {tickets.filter(t => t.ticket_status === 'Repairing' || t.ticket_status === 'Ready').length}
-                    </div>
-                  </div>
-                  <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Completed Repairs</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--color-success)' }}>
-                      {tickets.filter(t => t.ticket_status === 'Completed').length}
-                    </div>
-                  </div>
+              <div
+                style={{
+                  padding: 20,
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 12,
+                }}
+              >
+                <h3 style={{ fontSize: '1.1rem', marginBottom: 16, color: 'var(--color-primary)' }}>
+                  Repair pipeline
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <PipelineTile label="Pending / diagnosing" value={tickets.filter((t) => t.ticket_status === 'Pending' || t.ticket_status === 'Diagnosing').length} />
+                  <PipelineTile label="Waiting for parts" value={tickets.filter((t) => t.ticket_status === 'Waiting for Parts').length} color="var(--color-warning)" />
+                  <PipelineTile label="Repairing / ready" value={tickets.filter((t) => t.ticket_status === 'Repairing' || t.ticket_status === 'Ready').length} color="var(--color-info)" />
+                  <PipelineTile label="Completed" value={tickets.filter((t) => t.ticket_status === 'Completed').length} color="var(--color-success)" />
                 </div>
+                <button
+                  className="btn btn-secondary"
+                  style={{ width: '100%', marginTop: 20 }}
+                  onClick={() => exportToCSV(tickets, 'all_tickets.csv')}
+                >
+                  <FileText size={16} /> Export full ticket ledger
+                </button>
               </div>
-
             </div>
           </div>
         )}
-
       </main>
 
-      {/* MODAL: ALLOCATE COMPONENT PARTS TO TICKET */}
-      {showAllocatePartModal && selectedTicketForPart && (
-        <div style={{ position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh', background: 'rgba(0, 0, 0, 0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: '999' }}>
-          <div className="glass-panel" style={{ width: '450px', padding: '24px', background: 'var(--bg-secondary)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ margin: '0' }}>Allocate Spare Part</h2>
-              <X size={20} style={{ cursor: 'pointer' }} onClick={() => setShowAllocatePartModal(false)} />
-            </div>
+      {/* ==================== MODALS ==================== */}
+      {showBranchModal && (
+        <BranchModal
+          branch={editingBranch}
+          onClose={() => setShowBranchModal(false)}
+          onSaved={async () => {
+            setShowBranchModal(false);
+            await loadAll();
+          }}
+          notify={notify}
+        />
+      )}
 
-            <p style={{ fontSize: '0.85rem', marginBottom: '16px' }}>
-              Assigning parts to customer repair tickets automatically subtracts from branch inventory. Ticket belongs to <strong>{selectedTicketForPart.branch_location}</strong>.
-            </p>
+      {showDeviceModal && (
+        <DeviceModal
+          branches={branchNames}
+          defaultBranch={selectedBranch === ALL_BRANCHES ? branchNames[0] ?? '' : selectedBranch}
+          onClose={() => setShowDeviceModal(false)}
+          onSaved={async () => {
+            setShowDeviceModal(false);
+            await loadAll();
+          }}
+          notify={notify}
+        />
+      )}
 
-            <form onSubmit={handleAllocatePartSubmit}>
-              <div className="form-group">
-                <label className="form-label">Available Parts at {selectedTicketForPart.branch_location}</label>
-                <select 
-                  value={selectedPartIdToAllocate}
-                  onChange={(e) => setSelectedPartIdToAllocate(e.target.value)}
-                  className="form-input"
-                  required
-                >
-                  <option value="">-- Choose Component --</option>
-                  {availablePartsForAllocation.map((part) => (
-                    <option key={part.part_id} value={part.part_id}>
-                      {part.part_name} (Stock: {part.stock_qty} | ₱{part.service_price})
+      {showPartModal && (
+        <PartModal
+          branches={branchNames}
+          existing={parts}
+          defaultBranch={selectedBranch === ALL_BRANCHES ? branchNames[0] ?? '' : selectedBranch}
+          onClose={() => setShowPartModal(false)}
+          onSaved={async () => {
+            setShowPartModal(false);
+            await loadAll();
+          }}
+          notify={notify}
+        />
+      )}
+
+      {showTicketModal && (
+        <TicketModal
+          branches={branchNames}
+          defaultBranch={selectedBranch === ALL_BRANCHES ? branchNames[0] ?? '' : selectedBranch}
+          onClose={() => setShowTicketModal(false)}
+          onSaved={async () => {
+            setShowTicketModal(false);
+            await loadAll();
+          }}
+          notify={notify}
+        />
+      )}
+
+      {showTransferModal && (
+        <TransferModal
+          branches={branchNames}
+          gadgets={gadgets}
+          parts={parts}
+          onClose={() => setShowTransferModal(false)}
+          onSaved={async () => {
+            setShowTransferModal(false);
+            await loadAll();
+          }}
+          notify={notify}
+        />
+      )}
+
+      {allocateTarget && (
+        <AllocateModal
+          ticket={allocateTarget}
+          parts={parts.filter((p) => p.branch_location === allocateTarget.branch_location && p.stock_qty > 0)}
+          onClose={() => setAllocateTarget(null)}
+          onSaved={async () => {
+            setAllocateTarget(null);
+            await loadAll();
+          }}
+          notify={notify}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* Small presentational helpers                                               */
+/* ========================================================================== */
+
+function MetricTile({
+  icon,
+  tint,
+  label,
+  value,
+  danger,
+}: {
+  icon: React.ReactNode;
+  tint: string;
+  label: string;
+  value: string;
+  danger?: boolean;
+}) {
+  return (
+    <div className="glass-panel" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ padding: 12, background: `rgba(${tint},0.1)`, borderRadius: 12 }}>{icon}</div>
+      <div>
+        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{label}</div>
+        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: danger ? 'var(--color-danger)' : 'inherit' }}>
+          {value}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PipelineTile({ label, value, color }: { label: string; value: number; color?: string }) {
+  return (
+    <div style={{ padding: 12, background: 'rgba(255,255,255,0.01)', borderRadius: 10 }}>
+      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{label}</div>
+      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: color ?? 'inherit' }}>{value}</div>
+    </div>
+  );
+}
+
+function BranchCell({ name }: { name: string }) {
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem' }}>
+      <MapPin size={12} color="var(--color-primary)" />
+      {name}
+    </span>
+  );
+}
+
+function EmptyRow({ span, show, text }: { span: number; show: boolean; text: string }) {
+  if (!show) return null;
+  return (
+    <tr>
+      <td colSpan={span} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
+        {text}
+      </td>
+    </tr>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function ModalActions({ onCancel, busy, submitLabel }: { onCancel: () => void; busy: boolean; submitLabel: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+      <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onCancel}>
+        Cancel
+      </button>
+      <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={busy}>
+        {busy ? 'Saving…' : submitLabel}
+      </button>
+    </div>
+  );
+}
+
+type Notify = (kind: 'ok' | 'err', text: string) => void;
+
+/* ========================================================================== */
+/* Branch add / edit                                                          */
+/* ========================================================================== */
+
+function BranchModal({
+  branch,
+  onClose,
+  onSaved,
+  notify,
+}: {
+  branch: Branch | null;
+  onClose: () => void;
+  onSaved: () => void;
+  notify: Notify;
+}) {
+  const [name, setName] = useState(branch?.name ?? '');
+  const [code, setCode] = useState(branch?.code ?? '');
+  const [address, setAddress] = useState(branch?.address ?? '');
+  const [phone, setPhone] = useState(branch?.phone ?? '');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    const payload = {
+      name: name.trim(),
+      code: code.trim() || null,
+      address: address.trim() || null,
+      phone: phone.trim() || null,
+    };
+    const { error } = branch
+      ? await supabase.from('branches').update(payload).eq('branch_id', branch.branch_id)
+      : await supabase.from('branches').insert(payload);
+    setBusy(false);
+    if (error) {
+      notify('err', error.message.includes('duplicate') ? 'A branch with that name or code already exists.' : error.message);
+      return;
+    }
+    notify('ok', branch ? 'Branch updated.' : `Branch “${payload.name}” added.`);
+    onSaved();
+  };
+
+  return (
+    <Modal title={branch ? 'Edit branch' : 'Add branch'} onClose={onClose}>
+      <form onSubmit={submit}>
+        <Field label="Store name *">
+          <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+        </Field>
+        <Field label="Short code (optional)">
+          <input className="form-input" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. JLOU" />
+        </Field>
+        <Field label="Address (optional)">
+          <input className="form-input" value={address} onChange={(e) => setAddress(e.target.value)} />
+        </Field>
+        <Field label="Contact number (optional)">
+          <input className="form-input" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </Field>
+        <ModalActions onCancel={onClose} busy={busy} submitLabel={branch ? 'Save changes' : 'Add branch'} />
+      </form>
+    </Modal>
+  );
+}
+
+/* ========================================================================== */
+/* Device (serialized) add                                                    */
+/* ========================================================================== */
+
+function DeviceModal({
+  branches,
+  defaultBranch,
+  onClose,
+  onSaved,
+  notify,
+}: {
+  branches: string[];
+  defaultBranch: string;
+  onClose: () => void;
+  onSaved: () => void;
+  notify: Notify;
+}) {
+  const [f, setF] = useState({
+    sku: '',
+    brand: '',
+    model: '',
+    storage: '',
+    ram: '',
+    color: '',
+    cost_price: '',
+    retail_price: '',
+    imei_1: '',
+    imei_2: '',
+    supplier_name: '',
+    current_branch: defaultBranch,
+  });
+  const [busy, setBusy] = useState(false);
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setF({ ...f, [k]: e.target.value });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!/^\d{15}$/.test(f.imei_1)) {
+      notify('err', 'IMEI 1 must be exactly 15 digits.');
+      return;
+    }
+    if (f.imei_2 && !/^\d{15}$/.test(f.imei_2)) {
+      notify('err', 'IMEI 2 must be exactly 15 digits when supplied.');
+      return;
+    }
+    const cost = Number(f.cost_price);
+    const retail = Number(f.retail_price);
+    if (retail < cost) {
+      notify('err', 'Retail price cannot be lower than cost price.');
+      return;
+    }
+
+    setBusy(true);
+    const { error } = await supabase.from('retail_gadgets').insert({
+      sku: f.sku.trim(),
+      brand: f.brand.trim(),
+      model: f.model.trim(),
+      storage: f.storage.trim(),
+      ram: f.ram.trim(),
+      color: f.color.trim(),
+      cost_price: cost,
+      retail_price: retail,
+      current_branch: f.current_branch,
+      status: 'In Stock',
+      imei_1: f.imei_1,
+      imei_2: f.imei_2 || null,
+      supplier_name: f.supplier_name.trim() || null,
+    });
+    setBusy(false);
+    if (error) {
+      notify('err', error.message.includes('duplicate') ? 'That IMEI is already registered.' : error.message);
+      return;
+    }
+    notify('ok', `${f.brand} ${f.model} added to ${f.current_branch}.`);
+    onSaved();
+  };
+
+  return (
+    <Modal title="Add serialized device" width={560} onClose={onClose}>
+      <form onSubmit={submit}>
+        <Field label="Receiving branch *">
+          <select className="form-input" value={f.current_branch} onChange={set('current_branch')} required>
+            {branches.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="SKU *">
+            <input className="form-input" value={f.sku} onChange={set('sku')} required />
+          </Field>
+          <Field label="Brand *">
+            <input className="form-input" value={f.brand} onChange={set('brand')} required />
+          </Field>
+          <Field label="Model *">
+            <input className="form-input" value={f.model} onChange={set('model')} required />
+          </Field>
+          <Field label="Color *">
+            <input className="form-input" value={f.color} onChange={set('color')} required />
+          </Field>
+          <Field label="Storage *">
+            <input className="form-input" value={f.storage} onChange={set('storage')} placeholder="256GB" required />
+          </Field>
+          <Field label="RAM *">
+            <input className="form-input" value={f.ram} onChange={set('ram')} placeholder="8GB" required />
+          </Field>
+          <Field label="Cost price *">
+            <input className="form-input" type="number" step="0.01" min="0" value={f.cost_price} onChange={set('cost_price')} required />
+          </Field>
+          <Field label="Retail price *">
+            <input className="form-input" type="number" step="0.01" min="0" value={f.retail_price} onChange={set('retail_price')} required />
+          </Field>
+        </div>
+        <Field label="IMEI 1 (15 digits) *">
+          <input className="form-input" value={f.imei_1} onChange={set('imei_1')} inputMode="numeric" maxLength={15} required />
+        </Field>
+        <Field label="IMEI 2 (optional)">
+          <input className="form-input" value={f.imei_2} onChange={set('imei_2')} inputMode="numeric" maxLength={15} />
+        </Field>
+        <Field label="Supplier (optional)">
+          <input className="form-input" value={f.supplier_name} onChange={set('supplier_name')} />
+        </Field>
+        <ModalActions onCancel={onClose} busy={busy} submitLabel="Add device" />
+      </form>
+    </Modal>
+  );
+}
+
+/* ========================================================================== */
+/* Part add / restock                                                         */
+/* ========================================================================== */
+
+function PartModal({
+  branches,
+  existing,
+  defaultBranch,
+  onClose,
+  onSaved,
+  notify,
+}: {
+  branches: string[];
+  existing: RepairPart[];
+  defaultBranch: string;
+  onClose: () => void;
+  onSaved: () => void;
+  notify: Notify;
+}) {
+  const [branch, setBranch] = useState(defaultBranch);
+  const [sku, setSku] = useState('');
+  const [partName, setPartName] = useState('');
+  const [compat, setCompat] = useState('');
+  const [qty, setQty] = useState('1');
+  const [minQty, setMinQty] = useState('5');
+  const [cost, setCost] = useState('');
+  const [service, setService] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // If this SKU already exists at this branch we restock instead of duplicating.
+  const match = existing.find((p) => p.sku === sku.trim() && p.branch_location === branch);
+
+  useEffect(() => {
+    if (match) {
+      setPartName(match.part_name);
+      setCompat(match.compatible_models.join(', '));
+      setCost(String(match.cost_price));
+      setService(String(match.service_price));
+      setMinQty(String(match.minimum_stock_threshold));
+    }
+  }, [match?.part_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const addQty = Number(qty);
+    const costN = Number(cost);
+    const serviceN = Number(service);
+    if (serviceN < costN) {
+      notify('err', 'Service price cannot be lower than cost price.');
+      return;
+    }
+    setBusy(true);
+    const { error } = match
+      ? await supabase
+          .from('repair_parts')
+          .update({
+            stock_qty: match.stock_qty + addQty,
+            part_name: partName.trim(),
+            compatible_models: compat.split(',').map((s) => s.trim()).filter(Boolean),
+            minimum_stock_threshold: Number(minQty),
+            cost_price: costN,
+            service_price: serviceN,
+          })
+          .eq('part_id', match.part_id)
+      : await supabase.from('repair_parts').insert({
+          sku: sku.trim(),
+          part_name: partName.trim(),
+          compatible_models: compat.split(',').map((s) => s.trim()).filter(Boolean),
+          branch_location: branch,
+          stock_qty: addQty,
+          minimum_stock_threshold: Number(minQty),
+          cost_price: costN,
+          service_price: serviceN,
+        });
+    setBusy(false);
+    if (error) {
+      notify('err', error.message);
+      return;
+    }
+    notify('ok', match ? `Restocked ${sku} at ${branch} (+${addQty}).` : `${partName} added to ${branch}.`);
+    onSaved();
+  };
+
+  return (
+    <Modal title="Add / restock part or accessory" width={560} onClose={onClose}>
+      <form onSubmit={submit}>
+        <Field label="Branch *">
+          <select className="form-input" value={branch} onChange={(e) => setBranch(e.target.value)} required>
+            {branches.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="SKU *">
+          <input className="form-input" value={sku} onChange={(e) => setSku(e.target.value)} required />
+        </Field>
+        {match && (
+          <div className="badge badge-info" style={{ display: 'block', padding: 10, marginBottom: 12 }}>
+            Already stocked here ({match.stock_qty} on hand) — this will add to the existing quantity.
+          </div>
+        )}
+        <Field label="Part / accessory name *">
+          <input className="form-input" value={partName} onChange={(e) => setPartName(e.target.value)} required />
+        </Field>
+        <Field label="Compatible models (comma separated)">
+          <input className="form-input" value={compat} onChange={(e) => setCompat(e.target.value)} placeholder="iPhone 15 Pro, iPhone 15" />
+        </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label={match ? 'Quantity to add *' : 'Starting quantity *'}>
+            <input className="form-input" type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} required />
+          </Field>
+          <Field label="Low-stock alert level *">
+            <input className="form-input" type="number" min="0" value={minQty} onChange={(e) => setMinQty(e.target.value)} required />
+          </Field>
+          <Field label="Cost price *">
+            <input className="form-input" type="number" step="0.01" min="0" value={cost} onChange={(e) => setCost(e.target.value)} required />
+          </Field>
+          <Field label="Service / retail price *">
+            <input className="form-input" type="number" step="0.01" min="0" value={service} onChange={(e) => setService(e.target.value)} required />
+          </Field>
+        </div>
+        <ModalActions onCancel={onClose} busy={busy} submitLabel={match ? 'Restock' : 'Add part'} />
+      </form>
+    </Modal>
+  );
+}
+
+/* ========================================================================== */
+/* Repair ticket intake                                                       */
+/* ========================================================================== */
+
+function TicketModal({
+  branches,
+  defaultBranch,
+  onClose,
+  onSaved,
+  notify,
+}: {
+  branches: string[];
+  defaultBranch: string;
+  onClose: () => void;
+  onSaved: () => void;
+  notify: Notify;
+}) {
+  const [f, setF] = useState({
+    customer_name: '',
+    phone_number: '',
+    device_model: '',
+    imei_serial: '',
+    issue_description: '',
+    assigned_technician: '',
+    labor_cost: '0',
+    branch_location: defaultBranch,
+  });
+  const [busy, setBusy] = useState(false);
+  const set =
+    (k: keyof typeof f) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      setF({ ...f, [k]: e.target.value });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    const labor = Number(f.labor_cost) || 0;
+    const { error } = await supabase.from('service_tickets').insert({
+      customer_name: f.customer_name.trim(),
+      phone_number: f.phone_number.trim(),
+      device_model: f.device_model.trim(),
+      imei_serial: f.imei_serial.trim(),
+      issue_description: f.issue_description.trim(),
+      assigned_technician: f.assigned_technician.trim() || null,
+      labor_cost: labor,
+      total_amount: labor,
+      branch_location: f.branch_location,
+      ticket_status: 'Pending',
+    });
+    setBusy(false);
+    if (error) {
+      notify('err', error.message);
+      return;
+    }
+    notify('ok', `Ticket opened for ${f.customer_name}.`);
+    onSaved();
+  };
+
+  return (
+    <Modal title="New repair ticket" width={560} onClose={onClose}>
+      <form onSubmit={submit}>
+        <Field label="Branch *">
+          <select className="form-input" value={f.branch_location} onChange={set('branch_location')} required>
+            {branches.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Customer name *">
+            <input className="form-input" value={f.customer_name} onChange={set('customer_name')} required />
+          </Field>
+          <Field label="Contact number *">
+            <input className="form-input" value={f.phone_number} onChange={set('phone_number')} required />
+          </Field>
+          <Field label="Device model *">
+            <input className="form-input" value={f.device_model} onChange={set('device_model')} required />
+          </Field>
+          <Field label="IMEI / serial *">
+            <input className="form-input" value={f.imei_serial} onChange={set('imei_serial')} required />
+          </Field>
+        </div>
+        <Field label="Reported issue *">
+          <textarea
+            className="form-input"
+            rows={3}
+            value={f.issue_description}
+            onChange={set('issue_description')}
+            required
+            style={{ resize: 'vertical' }}
+          />
+        </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Assigned technician">
+            <input className="form-input" value={f.assigned_technician} onChange={set('assigned_technician')} />
+          </Field>
+          <Field label="Labor cost">
+            <input className="form-input" type="number" step="0.01" min="0" value={f.labor_cost} onChange={set('labor_cost')} />
+          </Field>
+        </div>
+        <ModalActions onCancel={onClose} busy={busy} submitLabel="Open ticket" />
+      </form>
+    </Modal>
+  );
+}
+
+/* ========================================================================== */
+/* Allocate part to ticket                                                    */
+/* ========================================================================== */
+
+function AllocateModal({
+  ticket,
+  parts,
+  onClose,
+  onSaved,
+  notify,
+}: {
+  ticket: ServiceTicket;
+  parts: RepairPart[];
+  onClose: () => void;
+  onSaved: () => void;
+  notify: Notify;
+}) {
+  const [partId, setPartId] = useState('');
+  const [qty, setQty] = useState('1');
+  const [busy, setBusy] = useState(false);
+  const part = parts.find((p) => p.part_id === partId);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!part) return;
+    const n = Number(qty);
+    if (n > part.stock_qty) {
+      notify('err', `Only ${part.stock_qty} in stock at ${ticket.branch_location}.`);
+      return;
+    }
+    setBusy(true);
+    // The DB trigger deducts stock and re-totals the invoice.
+    const { error } = await supabase.from('ticket_parts_used').insert({
+      ticket_id: ticket.ticket_id,
+      part_id: partId,
+      quantity_used: n,
+      price_charged: part.service_price,
+    });
+    setBusy(false);
+    if (error) {
+      notify(
+        'err',
+        error.message.includes('duplicate')
+          ? 'That part is already on this ticket — edit the existing line instead.'
+          : error.message
+      );
+      return;
+    }
+    notify('ok', `${part.part_name} ×${n} allocated. Invoice updated.`);
+    onSaved();
+  };
+
+  return (
+    <Modal title="Allocate spare part" onClose={onClose}>
+      <p style={{ fontSize: '0.85rem', marginBottom: 16 }}>
+        Ticket for <strong>{ticket.customer_name}</strong> at <strong>{ticket.branch_location}</strong>. Allocating
+        deducts from that branch&apos;s stock and adds the part to the repair invoice.
+      </p>
+      <form onSubmit={submit}>
+        <Field label={`Available parts at ${ticket.branch_location}`}>
+          <select className="form-input" value={partId} onChange={(e) => setPartId(e.target.value)} required>
+            <option value="">— choose component —</option>
+            {parts.map((p) => (
+              <option key={p.part_id} value={p.part_id}>
+                {p.part_name} (stock {p.stock_qty} · {peso(p.service_price)})
+              </option>
+            ))}
+          </select>
+        </Field>
+        {parts.length === 0 && (
+          <div className="badge badge-warning" style={{ display: 'block', padding: 10, marginBottom: 12 }}>
+            No parts in stock at this branch. Add stock or transfer some in first.
+          </div>
+        )}
+        <Field label="Quantity to consume">
+          <input className="form-input" type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} required />
+        </Field>
+        <ModalActions onCancel={onClose} busy={busy} submitLabel="Allocate" />
+      </form>
+    </Modal>
+  );
+}
+
+/* ========================================================================== */
+/* Dispatch transfer                                                          */
+/* ========================================================================== */
+
+function TransferModal({
+  branches,
+  gadgets,
+  parts,
+  onClose,
+  onSaved,
+  notify,
+}: {
+  branches: string[];
+  gadgets: RetailGadget[];
+  parts: RepairPart[];
+  onClose: () => void;
+  onSaved: () => void;
+  notify: Notify;
+}) {
+  const [source, setSource] = useState(branches[0] ?? '');
+  const [dest, setDest] = useState(branches[1] ?? '');
+  const [itemType, setItemType] = useState<ItemType>('Serialized');
+  const [refId, setRefId] = useState('');
+  const [qty, setQty] = useState('1');
+  const [dispatcher, setDispatcher] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (source === dest) {
+      notify('err', 'Source and destination must be different branches.');
+      return;
+    }
+
+    if (itemType === 'Serialized') {
+      const g = gadgets.find((x) => x.imei_1 === refId && x.current_branch === source);
+      if (!g) {
+        notify('err', `IMEI ${refId} is not at ${source}.`);
+        return;
+      }
+      if (g.status !== 'In Stock') {
+        notify('err', `Device is “${g.status}” — only In Stock devices can be transferred.`);
+        return;
+      }
+      setBusy(true);
+      const { error } = await supabase.from('branch_transfers').insert({
+        source_branch: source,
+        destination_branch: dest,
+        item_type: 'Serialized',
+        reference_identifier: refId,
+        quantity: 1,
+        dispatcher: dispatcher.trim(),
+      });
+      if (!error) {
+        await supabase.from('retail_gadgets').update({ status: 'In Transit' }).eq('item_id', g.item_id);
+      }
+      setBusy(false);
+      if (error) {
+        notify('err', error.message);
+        return;
+      }
+    } else {
+      const n = Number(qty);
+      const p = parts.find((x) => x.sku === refId && x.branch_location === source);
+      if (!p || p.stock_qty < n) {
+        notify('err', `Insufficient stock at ${source} (have ${p?.stock_qty ?? 0}).`);
+        return;
+      }
+      setBusy(true);
+      const { error } = await supabase.from('branch_transfers').insert({
+        source_branch: source,
+        destination_branch: dest,
+        item_type: 'Bulk',
+        reference_identifier: refId,
+        quantity: n,
+        dispatcher: dispatcher.trim(),
+      });
+      if (!error) {
+        await supabase.from('repair_parts').update({ stock_qty: p.stock_qty - n }).eq('part_id', p.part_id);
+      }
+      setBusy(false);
+      if (error) {
+        notify('err', error.message);
+        return;
+      }
+    }
+
+    notify('ok', 'Transfer dispatched and marked In Transit.');
+    onSaved();
+  };
+
+  const sourceStock =
+    itemType === 'Serialized'
+      ? gadgets.filter((g) => g.current_branch === source && g.status === 'In Stock')
+      : parts.filter((p) => p.branch_location === source && p.stock_qty > 0);
+
+  return (
+    <Modal title="Dispatch branch transfer" width={520} onClose={onClose}>
+      <form onSubmit={submit}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Source branch *">
+            <select className="form-input" value={source} onChange={(e) => setSource(e.target.value)} required>
+              {branches.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Destination branch *">
+            <select className="form-input" value={dest} onChange={(e) => setDest(e.target.value)} required>
+              {branches.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <Field label="Item category *">
+          <select
+            className="form-input"
+            value={itemType}
+            onChange={(e) => {
+              setItemType(e.target.value as ItemType);
+              setRefId('');
+            }}
+          >
+            <option value="Serialized">Serialized device (by IMEI)</option>
+            <option value="Bulk">Bulk part / accessory (by SKU)</option>
+          </select>
+        </Field>
+
+        <Field label={itemType === 'Serialized' ? 'Device in stock at source *' : 'Part in stock at source *'}>
+          <select className="form-input" value={refId} onChange={(e) => setRefId(e.target.value)} required>
+            <option value="">— choose item —</option>
+            {itemType === 'Serialized'
+              ? (sourceStock as RetailGadget[]).map((g) => (
+                  <option key={g.item_id} value={g.imei_1}>
+                    {g.brand} {g.model} · {g.color} · {g.imei_1}
+                  </option>
+                ))
+              : (sourceStock as RepairPart[]).map((p) => (
+                  <option key={p.part_id} value={p.sku}>
+                    {p.part_name} · {p.sku} · stock {p.stock_qty}
+                  </option>
+                ))}
+          </select>
+        </Field>
+
+        {itemType === 'Bulk' && (
+          <Field label="Quantity *">
+            <input className="form-input" type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} required />
+          </Field>
+        )}
+
+        <Field label="Dispatcher name *">
+          <input className="form-input" value={dispatcher} onChange={(e) => setDispatcher(e.target.value)} required />
+        </Field>
+
+        <ModalActions onCancel={onClose} busy={busy} submitLabel="Dispatch" />
+      </form>
+    </Modal>
+  );
+}
+
+/* ========================================================================== */
+/* Sales / cashier tab                                                        */
+/* ========================================================================== */
+
+function SalesTab({
+  branches,
+  gadgets,
+  parts,
+  notify,
+  reload,
+  defaultBranch,
+}: {
+  branches: string[];
+  gadgets: RetailGadget[];
+  parts: RepairPart[];
+  notify: Notify;
+  reload: () => Promise<void>;
+  defaultBranch: string;
+}) {
+  const [branch, setBranch] = useState(defaultBranch);
+  const [mode, setMode] = useState<'device' | 'accessory'>('device');
+  const [imei, setImei] = useState('');
+  const [partId, setPartId] = useState('');
+  const [qty, setQty] = useState('1');
+  const [busy, setBusy] = useState(false);
+  const [invoice, setInvoice] = useState<{
+    type: string;
+    branch: string;
+    item: string;
+    identifier: string;
+    total: number;
+    time: string;
+    no: string;
+  } | null>(null);
+
+  const branchDevices = gadgets.filter((g) => g.current_branch === branch && g.status === 'In Stock');
+  const branchParts = parts.filter((p) => p.branch_location === branch && p.stock_qty > 0);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      if (mode === 'device') {
+        const g = branchDevices.find((x) => x.imei_1 === imei);
+        if (!g) {
+          notify('err', `No In Stock device with IMEI ${imei} at ${branch}.`);
+          return;
+        }
+        const { error } = await supabase.from('retail_gadgets').update({ status: 'Sold' }).eq('item_id', g.item_id);
+        if (error) {
+          notify('err', error.message);
+          return;
+        }
+        setInvoice({
+          type: 'Serialized device sale',
+          branch,
+          item: `${g.brand} ${g.model} (${g.color}, ${g.storage})`,
+          identifier: `IMEI: ${g.imei_1}`,
+          total: Number(g.retail_price),
+          time: new Date().toLocaleString(),
+          no: `INV-${g.item_id.substring(0, 6).toUpperCase()}`,
+        });
+        setImei('');
+      } else {
+        const p = branchParts.find((x) => x.part_id === partId);
+        const n = Number(qty);
+        if (!p) {
+          notify('err', 'Choose an accessory first.');
+          return;
+        }
+        if (p.stock_qty < n) {
+          notify('err', `Only ${p.stock_qty} left at ${branch}.`);
+          return;
+        }
+        const { error } = await supabase
+          .from('repair_parts')
+          .update({ stock_qty: p.stock_qty - n })
+          .eq('part_id', p.part_id);
+        if (error) {
+          notify('err', error.message);
+          return;
+        }
+        setInvoice({
+          type: 'Accessory / parts sale',
+          branch,
+          item: p.part_name,
+          identifier: `SKU: ${p.sku} × ${n}`,
+          total: Number(p.service_price) * n,
+          time: new Date().toLocaleString(),
+          no: `INV-${p.part_id.substring(0, 6).toUpperCase()}`,
+        });
+        setPartId('');
+        setQty('1');
+      }
+      notify('ok', 'Sale recorded and stock deducted.');
+      await reload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 30 }}>
+      <div className="glass-panel" style={{ padding: 24 }}>
+        <h2>Issue customer invoice</h2>
+        <p style={{ marginBottom: 20 }}>Stock is deducted from the selected branch the moment you confirm.</p>
+
+        <form onSubmit={submit}>
+          <Field label="Sales register branch *">
+            <select className="form-input" value={branch} onChange={(e) => setBranch(e.target.value)} required>
+              {branches.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <button
+              type="button"
+              className={`btn ${mode === 'device' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ flex: 1 }}
+              onClick={() => setMode('device')}
+            >
+              Phone / tablet
+            </button>
+            <button
+              type="button"
+              className={`btn ${mode === 'accessory' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ flex: 1 }}
+              onClick={() => setMode('accessory')}
+            >
+              Accessory / part
+            </button>
+          </div>
+
+          {mode === 'device' ? (
+            <Field label="Device in stock *">
+              <select className="form-input" value={imei} onChange={(e) => setImei(e.target.value)} required>
+                <option value="">— scan or choose IMEI —</option>
+                {branchDevices.map((g) => (
+                  <option key={g.item_id} value={g.imei_1}>
+                    {g.brand} {g.model} · {g.color} · {g.imei_1} · {peso(g.retail_price)}
+                  </option>
+                ))}
+              </select>
+              {branchDevices.length === 0 && (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                  No devices in stock at {branch}.
+                </div>
+              )}
+            </Field>
+          ) : (
+            <>
+              <Field label="Accessory / part *">
+                <select className="form-input" value={partId} onChange={(e) => setPartId(e.target.value)} required>
+                  <option value="">— choose item —</option>
+                  {branchParts.map((p) => (
+                    <option key={p.part_id} value={p.part_id}>
+                      {p.part_name} · {p.sku} · stock {p.stock_qty} · {peso(p.service_price)}
                     </option>
                   ))}
                 </select>
-              </div>
+              </Field>
+              <Field label="Quantity *">
+                <input className="form-input" type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} required />
+              </Field>
+            </>
+          )}
 
-              <div className="form-group">
-                <label className="form-label">Quantity to Consume</label>
-                <input 
-                  type="number" 
-                  min="1"
-                  value={allocateQty}
-                  onChange={(e) => setAllocateQty(parseInt(e.target.value) || 1)}
-                  className="form-input"
-                  required
-                />
-              </div>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', height: 48 }} disabled={busy}>
+            {busy ? 'Processing…' : 'Confirm sale & deduct stock'}
+          </button>
+        </form>
+      </div>
 
-              <div style={{ display: 'flex', justifySelf: 'stretch', gap: '12px', marginTop: '24px' }}>
-                <button type="button" className="btn btn-secondary" style={{ flex: '1' }} onClick={() => setShowAllocatePartModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" style={{ flex: '1' }}>
-                  Allocate Component
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: DISPATCH LOGISTICS TRANSFER */}
-      {showTransferModal && (
-        <div style={{ position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh', background: 'rgba(0, 0, 0, 0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: '999' }}>
-          <div className="glass-panel" style={{ width: '480px', padding: '24px', background: 'var(--bg-secondary)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ margin: '0' }}>Dispatch Branch Transfer</h2>
-              <X size={20} style={{ cursor: 'pointer' }} onClick={() => setShowTransferModal(false)} />
+      <div className="glass-panel" style={{ padding: 24, display: 'flex', flexDirection: 'column' }}>
+        <h2>Receipt</h2>
+        {invoice ? (
+          <div
+            style={{
+              padding: 24,
+              background: '#0e1420',
+              border: '1px dashed var(--border-color)',
+              borderRadius: 12,
+              fontFamily: 'monospace',
+              fontSize: '0.9rem',
+              color: '#a5f3fc',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{
+                textAlign: 'center',
+                borderBottom: '1px dashed rgba(255,255,255,0.1)',
+                paddingBottom: 16,
+                marginBottom: 16,
+              }}
+            >
+              <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#fff' }}>{invoice.branch}</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Official sales record</div>
             </div>
-
-            <form onSubmit={handleDispatchTransfer}>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }} className="form-group">
-                <div>
-                  <label className="form-label">Source Branch</label>
-                  <select 
-                    value={transferSource} 
-                    onChange={(e) => setTransferSource(e.target.value as BranchLocation)}
-                    className="form-input"
-                  >
-                    <option value="Branch A">Branch A</option>
-                    <option value="Branch B">Branch B</option>
-                    <option value="Branch C">Branch C</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Destination Branch</label>
-                  <select 
-                    value={transferDest} 
-                    onChange={(e) => setTransferDest(e.target.value as BranchLocation)}
-                    className="form-input"
-                  >
-                    <option value="Branch B">Branch B</option>
-                    <option value="Branch A">Branch A</option>
-                    <option value="Branch C">Branch C</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Inventory Item Category</label>
-                <select 
-                  value={transferItemType} 
-                  onChange={(e) => setTransferItemType(e.target.value as 'Serialized' | 'Bulk')}
-                  className="form-input"
-                >
-                  <option value="Serialized">Serialized (Cellphones by IMEI)</option>
-                  <option value="Bulk">Bulk Parts &amp; Accessories</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  {transferItemType === 'Serialized' ? 'Unique Device IMEI (15 Digits)' : 'Component SKU'}
-                </label>
-                <input 
-                  type="text" 
-                  placeholder={transferItemType === 'Serialized' ? "e.g. 358912345678910" : "e.g. PART-GEN-PORT"}
-                  value={transferRefId}
-                  onChange={(e) => setTransferRefId(e.target.value)}
-                  className="form-input"
-                  required
-                />
-              </div>
-
-              {transferItemType === 'Bulk' && (
-                <div className="form-group">
-                  <label className="form-label">Transfer Quantity</label>
-                  <input 
-                    type="number" 
-                    min="1"
-                    value={transferQty}
-                    onChange={(e) => setTransferQty(parseInt(e.target.value) || 1)}
-                    className="form-input"
-                    required
-                  />
-                </div>
-              )}
-
-              <div className="form-group">
-                <label className="form-label">Dispatcher Name</label>
-                <input 
-                  type="text" 
-                  value={transferDispatcher}
-                  onChange={(e) => setTransferDispatcher(e.target.value)}
-                  className="form-input"
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifySelf: 'stretch', gap: '12px', marginTop: '24px' }}>
-                <button type="button" className="btn btn-secondary" style={{ flex: '1' }} onClick={() => setShowTransferModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" style={{ flex: '1' }}>
-                  Dispatch Transfer
-                </button>
-              </div>
-            </form>
+            <Line k="Invoice no" v={invoice.no} />
+            <Line k="Date" v={invoice.time} />
+            <Line k="Type" v={invoice.type} />
+            <div
+              style={{
+                borderTop: '1px dashed rgba(255,255,255,0.1)',
+                borderBottom: '1px dashed rgba(255,255,255,0.1)',
+                padding: '16px 0',
+                margin: '16px 0',
+              }}
+            >
+              <div style={{ fontWeight: 'bold', color: '#fff', marginBottom: 4 }}>{invoice.item}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{invoice.identifier}</div>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '1.15rem',
+                fontWeight: 'bold',
+                color: '#fff',
+                marginTop: 'auto',
+              }}
+            >
+              <span>TOTAL</span>
+              <span>{peso(invoice.total)}</span>
+            </div>
+            <button className="btn btn-secondary" style={{ marginTop: 20 }} onClick={() => window.print()}>
+              <FileText size={16} /> Print
+            </button>
           </div>
-        </div>
-      )}
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: 1,
+              border: '2px dashed var(--border-color)',
+              borderRadius: 12,
+              padding: 40,
+              textAlign: 'center',
+              color: 'var(--text-muted)',
+            }}
+          >
+            <FileText size={44} style={{ marginBottom: 16, opacity: 0.5 }} />
+            <p>Complete a sale to generate a receipt.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
+function Line({ k, v }: { k: string; v: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+      <span>{k}:</span>
+      <span style={{ color: '#fff' }}>{v}</span>
     </div>
   );
 }

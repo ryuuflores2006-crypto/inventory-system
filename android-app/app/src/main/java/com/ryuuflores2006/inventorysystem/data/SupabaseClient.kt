@@ -5,6 +5,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.gotrue.auth
 import io.ktor.client.plugins.cookies.AcceptAllCookiesStorage
@@ -42,6 +43,63 @@ object SupabaseHelper {
             if (client == null) init()
             return client!!.auth
         }
+
+    // --- Branches Service ---
+    // Branches are runtime rows shared with the PC dashboard, not a hardcoded list.
+    suspend fun getBranches(activeOnly: Boolean = true): List<Branch> = withContext(Dispatchers.IO) {
+        try {
+            postgrest["branches"].select {
+                if (activeOnly) {
+                    filter { eq("is_active", true) }
+                }
+                order("is_main", Order.DESCENDING)
+                order("name", Order.ASCENDING)
+            }.decodeList()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    /** Returns null on success, or a human-readable error message. */
+    suspend fun addBranch(
+        name: String,
+        code: String? = null,
+        address: String? = null,
+        phone: String? = null
+    ): String? = withContext(Dispatchers.IO) {
+        try {
+            postgrest["branches"].insert(
+                Branch(
+                    name = name.trim(),
+                    code = code?.trim()?.ifBlank { null },
+                    address = address?.trim()?.ifBlank { null },
+                    phone = phone?.trim()?.ifBlank { null }
+                )
+            )
+            null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            val msg = e.message ?: "Could not add branch."
+            if (msg.contains("duplicate", ignoreCase = true)) {
+                "A branch with that name or code already exists."
+            } else {
+                msg
+            }
+        }
+    }
+
+    suspend fun setBranchActive(branchId: String, active: Boolean): Boolean = withContext(Dispatchers.IO) {
+        try {
+            postgrest["branches"].update({ set("is_active", active) }) {
+                filter { eq("branch_id", branchId) }
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
 
     // --- Gadgets Service ---
     suspend fun getGadgetOrNullByImei(imei: String): RetailGadget? = withContext(Dispatchers.IO) {

@@ -1,163 +1,233 @@
--- Supabase SQL Schema for Centralized Multi-Branch Inventory System
--- Branches: 'Branch A', 'Branch B', 'Branch C'
+-- ============================================================================
+--  Multi-Branch Android Repair & Gadget Retail Inventory System
+--  Supabase / PostgreSQL schema  (v2)
+--
+--  Key change vs v1: branches are NO LONGER a hardcoded enum.
+--  They live in the `branches` table and can be added / renamed / archived
+--  at runtime from the Android app and the PC web dashboard.
+--
+--  Run this file once in the Supabase SQL Editor.
+--  No demo/sample data: the only rows inserted are the three real stores.
+--  Everything else (devices, parts, tickets, transfers) is added from the apps.
+-- ============================================================================
 
--- Drop existing tables if they exist to allow clean migrations
-DROP TABLE IF EXISTS branch_transfers CASCADE;
-DROP TABLE IF EXISTS ticket_parts_used CASCADE;
-DROP TABLE IF EXISTS service_tickets CASCADE;
-DROP TABLE IF EXISTS repair_parts CASCADE;
-DROP TABLE IF EXISTS retail_gadgets CASCADE;
+-- ---------------------------------------------------------------------------
+-- 0. Clean slate (safe to re-run)
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS branch_transfers   CASCADE;
+DROP TABLE IF EXISTS ticket_parts_used  CASCADE;
+DROP TABLE IF EXISTS service_tickets    CASCADE;
+DROP TABLE IF EXISTS repair_parts       CASCADE;
+DROP TABLE IF EXISTS retail_gadgets     CASCADE;
+DROP TABLE IF EXISTS branches           CASCADE;
+DROP TABLE IF EXISTS profiles           CASCADE;
 
-DROP TYPE IF EXISTS branch_location_type CASCADE;
-DROP TYPE IF EXISTS gadget_status_type CASCADE;
-DROP TYPE IF EXISTS ticket_status_type CASCADE;
+DROP TYPE IF EXISTS branch_location_type CASCADE;  -- removed in v2
+DROP TYPE IF EXISTS gadget_status_type   CASCADE;
+DROP TYPE IF EXISTS ticket_status_type   CASCADE;
 DROP TYPE IF EXISTS transfer_status_type CASCADE;
+DROP TYPE IF EXISTS staff_role_type      CASCADE;
 
--- Enums
-CREATE TYPE branch_location_type AS ENUM ('Branch A', 'Branch B', 'Branch C');
-CREATE TYPE gadget_status_type AS ENUM ('In Stock', 'Reserved', 'Sold', 'In Transit', 'Returned');
-CREATE TYPE ticket_status_type AS ENUM ('Pending', 'Diagnosing', 'Waiting for Parts', 'Repairing', 'Ready', 'Completed');
+-- ---------------------------------------------------------------------------
+-- 1. Enums (statuses stay fixed; branches do not)
+-- ---------------------------------------------------------------------------
+CREATE TYPE gadget_status_type   AS ENUM ('In Stock', 'Reserved', 'Sold', 'In Transit', 'Returned');
+CREATE TYPE ticket_status_type   AS ENUM ('Pending', 'Diagnosing', 'Waiting for Parts', 'Repairing', 'Ready', 'Completed');
 CREATE TYPE transfer_status_type AS ENUM ('In Transit', 'Received', 'Cancelled');
+CREATE TYPE staff_role_type      AS ENUM ('owner', 'manager', 'technician', 'cashier');
 
--- 1. Retail Gadgets (Serialized Track)
-CREATE TABLE retail_gadgets (
-    item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    sku VARCHAR(50) NOT NULL,
-    brand VARCHAR(50) NOT NULL,
-    model VARCHAR(100) NOT NULL,
-    storage VARCHAR(20) NOT NULL,
-    ram VARCHAR(20) NOT NULL,
-    color VARCHAR(30) NOT NULL,
-    cost_price DECIMAL(10, 2) NOT NULL CHECK (cost_price >= 0),
-    retail_price DECIMAL(10, 2) NOT NULL CHECK (retail_price >= cost_price),
-    current_branch branch_location_type NOT NULL,
-    status gadget_status_type NOT NULL DEFAULT 'In Stock',
-    imei_1 VARCHAR(15) UNIQUE CHECK (imei_1 ~ '^[0-9]{15}$'),
-    imei_2 VARCHAR(15) UNIQUE CHECK (imei_2 IS NULL OR imei_2 ~ '^[0-9]{15}$'),
-    supplier_name VARCHAR(100),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- ---------------------------------------------------------------------------
+-- 2. Branches (the "addable" store list)
+--
+--  `name` is the natural key used by every other table so that the whole
+--  system keeps working with human-readable branch names. Renaming a branch
+--  cascades everywhere via ON UPDATE CASCADE.
+-- ---------------------------------------------------------------------------
+CREATE TABLE branches (
+    branch_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        VARCHAR(100) NOT NULL UNIQUE CHECK (length(trim(name)) > 0),
+    code        VARCHAR(20)  UNIQUE,
+    address     TEXT,
+    phone       VARCHAR(30),
+    is_main     BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 2. Repair Parts & Accessories (Bulk Track)
+-- Only one branch may be flagged as the main store.
+CREATE UNIQUE INDEX idx_branches_single_main ON branches (is_main) WHERE is_main;
+CREATE INDEX idx_branches_active ON branches (is_active);
+
+-- ---------------------------------------------------------------------------
+-- 3. Staff profiles (mirrors auth.users, adds role + home branch)
+-- ---------------------------------------------------------------------------
+CREATE TABLE profiles (
+    user_id     UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    full_name   VARCHAR(100),
+    role        staff_role_type NOT NULL DEFAULT 'cashier',
+    branch_name VARCHAR(100) REFERENCES branches(name) ON UPDATE CASCADE ON DELETE SET NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ---------------------------------------------------------------------------
+-- 4. Retail Gadgets (serialized track — one row per physical device)
+-- ---------------------------------------------------------------------------
+CREATE TABLE retail_gadgets (
+    item_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sku            VARCHAR(50)  NOT NULL,
+    brand          VARCHAR(50)  NOT NULL,
+    model          VARCHAR(100) NOT NULL,
+    storage        VARCHAR(20)  NOT NULL,
+    ram            VARCHAR(20)  NOT NULL,
+    color          VARCHAR(30)  NOT NULL,
+    cost_price     DECIMAL(10,2) NOT NULL CHECK (cost_price >= 0),
+    retail_price   DECIMAL(10,2) NOT NULL CHECK (retail_price >= cost_price),
+    current_branch VARCHAR(100) NOT NULL REFERENCES branches(name) ON UPDATE CASCADE ON DELETE RESTRICT,
+    status         gadget_status_type NOT NULL DEFAULT 'In Stock',
+    imei_1         VARCHAR(15) UNIQUE CHECK (imei_1 ~ '^[0-9]{15}$'),
+    imei_2         VARCHAR(15) UNIQUE CHECK (imei_2 IS NULL OR imei_2 ~ '^[0-9]{15}$'),
+    supplier_name  VARCHAR(100),
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ---------------------------------------------------------------------------
+-- 5. Repair Parts & Accessories (bulk track — quantity per branch)
+-- ---------------------------------------------------------------------------
 CREATE TABLE repair_parts (
-    part_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    sku VARCHAR(50) NOT NULL,
-    part_name VARCHAR(100) NOT NULL,
-    compatible_models TEXT[] NOT NULL,
-    branch_location branch_location_type NOT NULL,
-    stock_qty INT NOT NULL DEFAULT 0 CHECK (stock_qty >= 0),
+    part_id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sku                     VARCHAR(50)  NOT NULL,
+    part_name               VARCHAR(100) NOT NULL,
+    compatible_models       TEXT[] NOT NULL DEFAULT '{}',
+    branch_location         VARCHAR(100) NOT NULL REFERENCES branches(name) ON UPDATE CASCADE ON DELETE RESTRICT,
+    stock_qty               INT NOT NULL DEFAULT 0 CHECK (stock_qty >= 0),
     minimum_stock_threshold INT NOT NULL DEFAULT 5 CHECK (minimum_stock_threshold >= 0),
-    cost_price DECIMAL(10, 2) NOT NULL CHECK (cost_price >= 0),
-    service_price DECIMAL(10, 2) NOT NULL CHECK (service_price >= cost_price),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    cost_price              DECIMAL(10,2) NOT NULL CHECK (cost_price >= 0),
+    service_price           DECIMAL(10,2) NOT NULL CHECK (service_price >= cost_price),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (sku, branch_location)
 );
 
--- 3. Service Tickets (Repair Tracking)
+-- ---------------------------------------------------------------------------
+-- 6. Service Tickets (repair jobs)
+-- ---------------------------------------------------------------------------
 CREATE TABLE service_tickets (
-    ticket_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_name VARCHAR(100) NOT NULL,
-    phone_number VARCHAR(20) NOT NULL,
-    device_model VARCHAR(100) NOT NULL,
-    imei_serial VARCHAR(50) NOT NULL,
-    issue_description TEXT NOT NULL,
+    ticket_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_name       VARCHAR(100) NOT NULL,
+    phone_number        VARCHAR(20)  NOT NULL,
+    device_model        VARCHAR(100) NOT NULL,
+    imei_serial         VARCHAR(50)  NOT NULL,
+    issue_description   TEXT NOT NULL,
     assigned_technician VARCHAR(100),
-    ticket_status ticket_status_type NOT NULL DEFAULT 'Pending',
-    labor_cost DECIMAL(10, 2) NOT NULL DEFAULT 0.00 CHECK (labor_cost >= 0),
-    total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00 CHECK (total_amount >= 0),
-    branch_location branch_location_type NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    ticket_status       ticket_status_type NOT NULL DEFAULT 'Pending',
+    labor_cost          DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (labor_cost >= 0),
+    total_amount        DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
+    branch_location     VARCHAR(100) NOT NULL REFERENCES branches(name) ON UPDATE CASCADE ON DELETE RESTRICT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 4. Ticket Parts Used (Junction Table)
+-- ---------------------------------------------------------------------------
+-- 7. Ticket Parts Used (junction: which parts a repair consumed)
+-- ---------------------------------------------------------------------------
 CREATE TABLE ticket_parts_used (
     ticket_part_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ticket_id UUID NOT NULL REFERENCES service_tickets(ticket_id) ON DELETE CASCADE,
-    part_id UUID NOT NULL REFERENCES repair_parts(part_id) ON DELETE RESTRICT,
-    quantity_used INT NOT NULL DEFAULT 1 CHECK (quantity_used > 0),
-    price_charged DECIMAL(10, 2) NOT NULL CHECK (price_charged >= 0),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    ticket_id      UUID NOT NULL REFERENCES service_tickets(ticket_id) ON DELETE CASCADE,
+    part_id        UUID NOT NULL REFERENCES repair_parts(part_id) ON DELETE RESTRICT,
+    quantity_used  INT NOT NULL DEFAULT 1 CHECK (quantity_used > 0),
+    price_charged  DECIMAL(10,2) NOT NULL CHECK (price_charged >= 0),
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (ticket_id, part_id)
 );
 
--- 5. Branch Transfers (Transfer Logs)
+-- ---------------------------------------------------------------------------
+-- 8. Branch Transfers (stock moving between stores)
+-- ---------------------------------------------------------------------------
 CREATE TABLE branch_transfers (
-    transfer_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source_branch branch_location_type NOT NULL,
-    destination_branch branch_location_type NOT NULL CHECK (destination_branch <> source_branch),
-    item_type VARCHAR(20) NOT NULL CHECK (item_type IN ('Serialized', 'Bulk')),
-    reference_identifier VARCHAR(50) NOT NULL, -- IMEI for Serialized, SKU for Bulk
-    quantity INT NOT NULL DEFAULT 1 CHECK (quantity > 0),
-    dispatcher VARCHAR(100) NOT NULL,
-    receiver VARCHAR(100),
-    transfer_status transfer_status_type NOT NULL DEFAULT 'In Transit',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    transfer_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_branch        VARCHAR(100) NOT NULL REFERENCES branches(name) ON UPDATE CASCADE ON DELETE RESTRICT,
+    destination_branch   VARCHAR(100) NOT NULL REFERENCES branches(name) ON UPDATE CASCADE ON DELETE RESTRICT,
+    item_type            VARCHAR(20)  NOT NULL CHECK (item_type IN ('Serialized', 'Bulk')),
+    reference_identifier VARCHAR(50)  NOT NULL,  -- IMEI for Serialized, SKU for Bulk
+    quantity             INT NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    dispatcher           VARCHAR(100) NOT NULL,
+    receiver             VARCHAR(100),
+    transfer_status      transfer_status_type NOT NULL DEFAULT 'In Transit',
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (destination_branch <> source_branch)
 );
 
--- Create Indexes for Performance
-CREATE INDEX idx_retail_gadgets_imei ON retail_gadgets (imei_1);
-CREATE INDEX idx_retail_gadgets_sku ON retail_gadgets (sku);
+-- ---------------------------------------------------------------------------
+-- 9. Indexes
+-- ---------------------------------------------------------------------------
+CREATE INDEX idx_retail_gadgets_imei          ON retail_gadgets (imei_1);
+CREATE INDEX idx_retail_gadgets_sku           ON retail_gadgets (sku);
 CREATE INDEX idx_retail_gadgets_branch_status ON retail_gadgets (current_branch, status);
-CREATE INDEX idx_repair_parts_sku_branch ON repair_parts (sku, branch_location);
-CREATE INDEX idx_service_tickets_status ON service_tickets (ticket_status);
-CREATE INDEX idx_service_tickets_branch ON service_tickets (branch_location);
-CREATE INDEX idx_ticket_parts_used_ticket ON ticket_parts_used (ticket_id);
-CREATE INDEX idx_branch_transfers_status ON branch_transfers (transfer_status);
+CREATE INDEX idx_repair_parts_sku_branch      ON repair_parts (sku, branch_location);
+CREATE INDEX idx_service_tickets_status       ON service_tickets (ticket_status);
+CREATE INDEX idx_service_tickets_branch       ON service_tickets (branch_location);
+CREATE INDEX idx_ticket_parts_used_ticket     ON ticket_parts_used (ticket_id);
+CREATE INDEX idx_branch_transfers_status      ON branch_transfers (transfer_status);
+CREATE INDEX idx_branch_transfers_route       ON branch_transfers (source_branch, destination_branch);
 
--- Automatic Stock Adjustment & Cost Calculation Triggers
+-- ---------------------------------------------------------------------------
+-- 10. Triggers
+-- ---------------------------------------------------------------------------
 
--- Trigger Function 1: Manage repair parts stock level and compute service ticket totals
-CREATE OR REPLACE FUNCTION update_parts_stock_on_use()
+-- 10a. Generic updated_at stamper
+CREATE OR REPLACE FUNCTION touch_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF (TG_OP = 'INSERT') THEN
-        -- Subtract stock
-        UPDATE repair_parts
-        SET stock_qty = stock_qty - NEW.quantity_used
-        WHERE part_id = NEW.part_id;
-        
-        -- Recalculate ticket total
-        UPDATE service_tickets
-        SET total_amount = labor_cost + (
-            SELECT COALESCE(SUM(quantity_used * price_charged), 0)
-            FROM ticket_parts_used
-            WHERE ticket_id = NEW.ticket_id
-        )
-        WHERE ticket_id = NEW.ticket_id;
-        
-    ELSIF (TG_OP = 'UPDATE') THEN
-        -- Adjust stock based on diff
-        UPDATE repair_parts
-        SET stock_qty = stock_qty + OLD.quantity_used - NEW.quantity_used
-        WHERE part_id = NEW.part_id;
-        
-        -- Recalculate ticket total
-        UPDATE service_tickets
-        SET total_amount = labor_cost + (
-            SELECT COALESCE(SUM(quantity_used * price_charged), 0)
-            FROM ticket_parts_used
-            WHERE ticket_id = NEW.ticket_id
-        )
-        WHERE ticket_id = NEW.ticket_id;
-        
-    ELSIF (TG_OP = 'DELETE') THEN
-        -- Revert stock
-        UPDATE repair_parts
-        SET stock_qty = stock_qty + OLD.quantity_used
-        WHERE part_id = OLD.part_id;
-        
-        -- Recalculate ticket total
-        UPDATE service_tickets
-        SET total_amount = labor_cost + (
-            SELECT COALESCE(SUM(quantity_used * price_charged), 0)
-            FROM ticket_parts_used
-            WHERE ticket_id = OLD.ticket_id
-        )
-        WHERE ticket_id = OLD.ticket_id;
-    END IF;
+    NEW.updated_at := now();
     RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_branches_touch
+BEFORE UPDATE ON branches
+FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+CREATE TRIGGER trg_transfers_touch
+BEFORE UPDATE ON branch_transfers
+FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- 10b. Consuming a part deducts branch stock and re-totals the repair invoice
+CREATE OR REPLACE FUNCTION update_parts_stock_on_use()
+RETURNS TRIGGER AS $$
+DECLARE
+    affected_ticket UUID := COALESCE(NEW.ticket_id, OLD.ticket_id);
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        UPDATE repair_parts
+           SET stock_qty = stock_qty - NEW.quantity_used
+         WHERE part_id = NEW.part_id;
+
+    ELSIF (TG_OP = 'UPDATE') THEN
+        -- Return the old quantity to the old part, take the new one from the new part
+        UPDATE repair_parts
+           SET stock_qty = stock_qty + OLD.quantity_used
+         WHERE part_id = OLD.part_id;
+        UPDATE repair_parts
+           SET stock_qty = stock_qty - NEW.quantity_used
+         WHERE part_id = NEW.part_id;
+
+    ELSIF (TG_OP = 'DELETE') THEN
+        UPDATE repair_parts
+           SET stock_qty = stock_qty + OLD.quantity_used
+         WHERE part_id = OLD.part_id;
+    END IF;
+
+    UPDATE service_tickets
+       SET total_amount = labor_cost + COALESCE((
+               SELECT SUM(quantity_used * price_charged)
+                 FROM ticket_parts_used
+                WHERE ticket_id = affected_ticket
+           ), 0),
+           updated_at = now()
+     WHERE ticket_id = affected_ticket;
+
+    RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -165,16 +235,16 @@ CREATE TRIGGER trg_update_parts_stock
 AFTER INSERT OR UPDATE OR DELETE ON ticket_parts_used
 FOR EACH ROW EXECUTE FUNCTION update_parts_stock_on_use();
 
--- Trigger Function 2: Adjust service ticket total when labor cost is modified
+-- 10c. Editing labor cost re-totals the ticket
 CREATE OR REPLACE FUNCTION update_ticket_total_amount()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.total_amount := NEW.labor_cost + COALESCE((
         SELECT SUM(quantity_used * price_charged)
-        FROM ticket_parts_used
-        WHERE ticket_id = NEW.ticket_id
+          FROM ticket_parts_used
+         WHERE ticket_id = NEW.ticket_id
     ), 0);
-    NEW.updated_at := CURRENT_TIMESTAMP;
+    NEW.updated_at := now();
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -183,48 +253,114 @@ CREATE TRIGGER trg_update_ticket_total_amount
 BEFORE UPDATE OF labor_cost ON service_tickets
 FOR EACH ROW EXECUTE FUNCTION update_ticket_total_amount();
 
+-- 10d. Every new auth user automatically gets a staff profile
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER
+SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+    INSERT INTO public.profiles (user_id, full_name)
+    VALUES (NEW.id, NEW.raw_user_meta_data ->> 'full_name')
+    ON CONFLICT (user_id) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
--- Seed Data
+DROP TRIGGER IF EXISTS trg_on_auth_user_created ON auth.users;
+CREATE TRIGGER trg_on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
--- 1. Seed Serialized Devices
-INSERT INTO retail_gadgets (sku, brand, model, storage, ram, color, cost_price, retail_price, current_branch, status, imei_1, imei_2, supplier_name) VALUES
-('SKU-IPH15P-256', 'Apple', 'iPhone 15 Pro', '256GB', '8GB', 'Natural Titanium', 950.00, 1199.00, 'Branch A', 'In Stock', '358912345678901', '358912345678902', 'Apple Distribution Asia'),
-('SKU-IPH15P-256', 'Apple', 'iPhone 15 Pro', '256GB', '8GB', 'Blue Titanium', 950.00, 1199.00, 'Branch B', 'In Stock', '358912345678903', '358912345678904', 'Apple Distribution Asia'),
-('SKU-SAM-S24U-512', 'Samsung', 'Galaxy S24 Ultra', '512GB', '12GB', 'Titanium Black', 1100.00, 1399.00, 'Branch C', 'In Stock', '358912345678905', '358912345678906', 'Samsung Philippines'),
-('SKU-SAM-S24U-512', 'Samsung', 'Galaxy S24 Ultra', '512GB', '12GB', 'Titanium Gray', 1100.00, 1399.00, 'Branch A', 'Sold', '358912345678907', '358912345678908', 'Samsung Philippines'),
-('SKU-IPH14-128', 'Apple', 'iPhone 14', '128GB', '6GB', 'Midnight', 650.00, 799.00, 'Branch B', 'Sold', '358912345678909', NULL, 'Apple Distribution Asia'),
-('SKU-IPH15P-256', 'Apple', 'iPhone 15 Pro', '256GB', '8GB', 'Black Titanium', 950.00, 1199.00, 'Branch A', 'In Transit', '358912345678910', '358912345678911', 'Apple Distribution Asia'),
-('SKU-SAM-A55-128', 'Samsung', 'Galaxy A55 5G', '128GB', '8GB', 'Awesome Lilac', 300.00, 399.00, 'Branch C', 'In Stock', '358912345678912', '358912345678913', 'Samsung Philippines');
+-- ---------------------------------------------------------------------------
+-- 11. Atomic branch transfer receive (avoids the multi-step client race)
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION receive_branch_transfer(p_transfer_id UUID, p_receiver TEXT)
+RETURNS VOID
+SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+    t         branch_transfers%ROWTYPE;
+    src_part  repair_parts%ROWTYPE;
+BEGIN
+    SELECT * INTO t FROM branch_transfers WHERE transfer_id = p_transfer_id FOR UPDATE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Transfer % not found', p_transfer_id;
+    END IF;
+    IF t.transfer_status <> 'In Transit' THEN
+        RAISE EXCEPTION 'Transfer is already %', t.transfer_status;
+    END IF;
 
--- 2. Seed Repair Parts
-INSERT INTO repair_parts (sku, part_name, compatible_models, branch_location, stock_qty, minimum_stock_threshold, cost_price, service_price) VALUES
-('PART-IPH15P-SCR', 'iPhone 15 Pro OLED Screen Replacement', ARRAY['iPhone 15 Pro'], 'Branch A', 12, 3, 180.00, 299.00),
-('PART-IPH15P-SCR', 'iPhone 15 Pro OLED Screen Replacement', ARRAY['iPhone 15 Pro'], 'Branch B', 4, 3, 180.00, 299.00),
-('PART-IPH15P-SCR', 'iPhone 15 Pro OLED Screen Replacement', ARRAY['iPhone 15 Pro'], 'Branch C', 2, 3, 180.00, 299.00),
-('PART-S24U-BATT', 'Samsung Galaxy S24 Ultra Battery 5000mAh', ARRAY['Galaxy S24 Ultra', 'SM-S928B'], 'Branch A', 15, 5, 35.00, 75.00),
-('PART-S24U-BATT', 'Samsung Galaxy S24 Ultra Battery 5000mAh', ARRAY['Galaxy S24 Ultra', 'SM-S928B'], 'Branch B', 6, 5, 35.00, 75.00),
-('PART-GEN-PORT', 'Universal Type-C Charging Port Board v3', ARRAY['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], 'Branch A', 30, 10, 8.00, 25.00),
-('PART-GEN-PORT', 'Universal Type-C Charging Port Board v3', ARRAY['Galaxy A55 5G', 'Galaxy S24 Ultra', 'Xiaomi 13 Pro'], 'Branch C', 8, 10, 8.00, 25.00),
-('ACC-SCR-PROT', '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', ARRAY['iPhone 15', 'iPhone 15 Pro'], 'Branch A', 120, 20, 1.50, 10.00),
-('ACC-SCR-PROT', '9H Tempered Glass Screen Protector - iPhone 15/15 Pro', ARRAY['iPhone 15', 'iPhone 15 Pro'], 'Branch B', 45, 20, 1.50, 10.00);
+    IF t.item_type = 'Serialized' THEN
+        UPDATE retail_gadgets
+           SET current_branch = t.destination_branch,
+               status         = 'In Stock'
+         WHERE imei_1 = t.reference_identifier;
+    ELSE
+        SELECT * INTO src_part
+          FROM repair_parts
+         WHERE sku = t.reference_identifier AND branch_location = t.source_branch
+         LIMIT 1;
 
--- 3. Seed Service Tickets
-INSERT INTO service_tickets (customer_name, phone_number, device_model, imei_serial, issue_description, assigned_technician, ticket_status, labor_cost, branch_location) VALUES
-('John Doe', '+639171234567', 'iPhone 15 Pro', '358912345678901', 'Shattered screen from dropping. Screen completely black.', 'Alex Cruz', 'Repairing', 50.00, 'Branch A'),
-('Maria Santos', '+639189876543', 'Galaxy S24 Ultra', '358912345678905', 'Battery draining rapidly, device gets hot while charging.', 'Benjie Diaz', 'Pending', 30.00, 'Branch B'),
-('Gabriel Reyes', '+639205554433', 'iPhone 14', '358912345678909', 'Clean speaker grills and check charging port connection.', NULL, 'Diagnosing', 15.00, 'Branch A'),
-('Sarah Lee', '+639998887766', 'Xiaomi 13 Pro', '864239857392812', 'Replace cracked back glass panel.', 'Alex Cruz', 'Completed', 40.00, 'Branch A');
+        INSERT INTO repair_parts (sku, part_name, compatible_models, branch_location,
+                                  stock_qty, minimum_stock_threshold, cost_price, service_price)
+        VALUES (t.reference_identifier,
+                COALESCE(src_part.part_name, t.reference_identifier),
+                COALESCE(src_part.compatible_models, '{}'),
+                t.destination_branch,
+                t.quantity,
+                COALESCE(src_part.minimum_stock_threshold, 5),
+                COALESCE(src_part.cost_price, 0),
+                COALESCE(src_part.service_price, 0))
+        ON CONFLICT (sku, branch_location)
+        DO UPDATE SET stock_qty = repair_parts.stock_qty + EXCLUDED.stock_qty;
+    END IF;
 
--- 4. Seed Parts Used for Service Tickets
-INSERT INTO ticket_parts_used (ticket_id, part_id, quantity_used, price_charged) VALUES
-(
-    (SELECT ticket_id FROM service_tickets WHERE customer_name = 'John Doe' LIMIT 1),
-    (SELECT part_id FROM repair_parts WHERE sku = 'PART-IPH15P-SCR' AND branch_location = 'Branch A' LIMIT 1),
-    1,
-    299.00
-);
+    UPDATE branch_transfers
+       SET transfer_status = 'Received',
+           receiver        = p_receiver
+     WHERE transfer_id = p_transfer_id;
+END;
+$$ LANGUAGE plpgsql;
 
--- 5. Seed Branch Transfers
-INSERT INTO branch_transfers (source_branch, destination_branch, item_type, reference_identifier, quantity, dispatcher, receiver, transfer_status) VALUES
-('Branch A', 'Branch B', 'Serialized', '358912345678910', 1, 'Mark Manager', NULL, 'In Transit'),
-('Branch A', 'Branch C', 'Bulk', 'PART-GEN-PORT', 5, 'Mark Manager', 'Rene Technician', 'Received');
+-- ---------------------------------------------------------------------------
+-- 12. Row Level Security
+--
+--  Every table is readable/writable by any signed-in staff account.
+--  Anonymous (logged-out) clients get nothing.
+-- ---------------------------------------------------------------------------
+ALTER TABLE branches          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE retail_gadgets    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE repair_parts      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_tickets   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ticket_parts_used ENABLE ROW LEVEL SECURITY;
+ALTER TABLE branch_transfers  ENABLE ROW LEVEL SECURITY;
+
+DO $$
+DECLARE
+    tbl TEXT;
+BEGIN
+    FOREACH tbl IN ARRAY ARRAY['branches','retail_gadgets','repair_parts',
+                               'service_tickets','ticket_parts_used','branch_transfers']
+    LOOP
+        EXECUTE format(
+            'CREATE POLICY %I ON %I FOR ALL TO authenticated USING (true) WITH CHECK (true)',
+            'staff_full_access_' || tbl, tbl);
+    END LOOP;
+END $$;
+
+-- Staff may read all profiles but only edit their own.
+CREATE POLICY profiles_read   ON profiles FOR SELECT TO authenticated USING (true);
+CREATE POLICY profiles_update ON profiles FOR UPDATE TO authenticated
+    USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+GRANT EXECUTE ON FUNCTION receive_branch_transfer(UUID, TEXT) TO authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 13. Real branch seed (edit / add more from the app at any time)
+-- ---------------------------------------------------------------------------
+INSERT INTO branches (name, code, is_main) VALUES
+    ('J-LOU GADGET CENTER', 'JLOU', TRUE),
+    ('JEHABS CELLSHOP',     'JHBS', FALSE),
+    ('J-HUB CELLSHOP',      'JHUB', FALSE)
+ON CONFLICT (name) DO NOTHING;

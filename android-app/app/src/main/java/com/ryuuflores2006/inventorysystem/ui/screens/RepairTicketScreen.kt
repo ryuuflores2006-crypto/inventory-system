@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ryuuflores2006.inventorysystem.data.BranchStore
 import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.data.ServiceTicket
 import kotlinx.coroutines.launch
@@ -31,9 +32,17 @@ fun RepairTicketScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     var issueDescription by remember { mutableStateOf("") }
     var assignedTechnician by remember { mutableStateOf("") }
     var laborCostInput by remember { mutableStateOf("") }
-    var selectedBranch by remember { mutableStateOf("Branch A") }
+    var selectedBranch by remember { mutableStateOf("") }
 
     var isSubmitting by remember { mutableStateOf(false) }
+
+    // Intake locations come from the shared `branches` table.
+    LaunchedEffect(Unit) {
+        if (BranchStore.branches.isEmpty()) BranchStore.refresh()
+    }
+    LaunchedEffect(BranchStore.branches) {
+        if (selectedBranch !in BranchStore.names) selectedBranch = BranchStore.defaultName
+    }
 
     Column(
         modifier = Modifier
@@ -125,14 +134,17 @@ fun RepairTicketScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground)
             ) {
-                Text("Intake Location: $selectedBranch")
+                Text(
+                    if (selectedBranch.isBlank()) "Intake Location: none yet — add a branch first"
+                    else "Intake Location: $selectedBranch"
+                )
             }
             DropdownMenu(
                 expanded = branchExpanded,
                 onDismissRequest = { branchExpanded = false },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                listOf("Branch A", "Branch B", "Branch C").forEach { loc ->
+                BranchStore.names.forEach { loc ->
                     DropdownMenuItem(
                         text = { Text(loc) },
                         onClick = {
@@ -148,6 +160,10 @@ fun RepairTicketScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
 
         Button(
             onClick = {
+                if (selectedBranch.isBlank()) {
+                    Toast.makeText(context, "Add a branch first (Branches tab)", Toast.LENGTH_LONG).show()
+                    return@Button
+                }
                 if (customerName.isBlank() || phoneNumber.isBlank() || deviceModel.isBlank() || imeiSerial.isBlank() || issueDescription.isBlank()) {
                     Toast.makeText(context, "Please fill in all mandatory fields", Toast.LENGTH_SHORT).show()
                     return@Button

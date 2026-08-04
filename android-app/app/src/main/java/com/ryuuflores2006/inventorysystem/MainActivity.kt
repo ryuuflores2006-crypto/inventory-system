@@ -10,11 +10,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.ui.screens.BarcodeScanScreen
+import com.ryuuflores2006.inventorysystem.ui.screens.BranchScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.InventoryListScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.RepairTicketScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.StockInScreen
@@ -112,6 +114,12 @@ fun MainScreenContainer() {
                         icon = { Icon(Icons.Default.Build, contentDescription = "Repairs") },
                         label = { Text("Repairs") }
                     )
+                    NavigationBarItem(
+                        selected = currentTab == 3,
+                        onClick = { currentTab = 3 },
+                        icon = { Icon(Icons.Default.Home, contentDescription = "Branches") },
+                        label = { Text("Branches") }
+                    )
                 }
             }
         ) { innerPadding ->
@@ -126,6 +134,7 @@ fun MainScreenContainer() {
                         onScannedCallback = callback
                         isScannerActive = true
                     })
+                    3 -> BranchScreen()
                 }
             }
         }

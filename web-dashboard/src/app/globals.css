@@ -251,3 +251,24 @@ p {
   background-color: rgba(156, 163, 175, 0.1);
   color: var(--text-muted);
 }
+
+@keyframes spin-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin-rotate 0.9s linear infinite;
+}
+
+textarea.form-input {
+  font-family: var(--font-family);
+  line-height: 1.5;
+}
+
+@media print {
+  .sidebar,
+  .btn {
+    display: none !important;
+  }
+}

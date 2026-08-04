@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ryuuflores2006.inventorysystem.data.BranchStore
 import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.data.RetailGadget
 import com.ryuuflores2006.inventorysystem.data.RepairPart
@@ -32,6 +33,10 @@ fun InventoryListScreen() {
     var gadgets by remember { mutableStateOf<List<RetailGadget>>(emptyList()) }
     var parts by remember { mutableStateOf<List<RepairPart>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (BranchStore.branches.isEmpty()) BranchStore.refresh()
+    }
 
     // Fetch data
     LaunchedEffect(key1 = selectedTab, key2 = branchFilter) {
@@ -85,7 +90,7 @@ fun InventoryListScreen() {
                     expanded = dropdownExpanded,
                     onDismissRequest = { dropdownExpanded = false }
                 ) {
-                    listOf("All Branches", "Branch A", "Branch B", "Branch C").forEach { loc ->
+                    (listOf("All Branches") + BranchStore.names).forEach { loc ->
                         DropdownMenuItem(
                             text = { Text(loc) },
                             onClick = {
