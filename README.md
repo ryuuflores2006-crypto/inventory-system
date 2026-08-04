@@ -123,6 +123,11 @@ everything**, so never run it again once you have real data.
 
 RLS denies everything to anonymous clients, so both platforms require a staff sign-in.
 
+**Email confirmation is turned off** on the live project (Authentication → Sign In / Providers
+→ User Signups → *Confirm email*). Staff registering on the shop floor get a session
+immediately instead of waiting for a confirmation link, and the free tier's ~2 emails/hour
+cap never blocks a signup. Turn it back on only if you start accepting public signups.
+
 ### Running the Web Dashboard
 1. Navigate to the `web-dashboard` directory.
 2. The live project URL and anon (publishable) key are already baked into
@@ -168,6 +173,7 @@ i.e. the exact path both apps take. Test data was deleted afterwards.
 | --- | --- |
 | Anonymous client can read any table | Blocked by RLS |
 | Anonymous client can insert | Blocked by RLS |
+| Staff registration | Signs in instantly, no confirmation email |
 | Staff registration auto-creates a profile | Trigger fires |
 | Staff sign-in | Works on both platforms |
 | Add a branch at runtime, then stock it | Device, part and ticket all accepted |
