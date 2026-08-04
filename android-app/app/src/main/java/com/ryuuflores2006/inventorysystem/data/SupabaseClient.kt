@@ -7,6 +7,7 @@ import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.functions.functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.gotrue.auth
@@ -14,6 +15,8 @@ import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.realtime.realtime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 object SupabaseHelper {
     private var client: SupabaseClient? = null
@@ -234,6 +237,53 @@ object SupabaseHelper {
             emptyList()
         }
     }
+
+    /**
+     * Send a unit or a batch of parts to another store.
+     *
+     * A serialized handset is marked `In Transit` in the same breath, so it
+     * stops showing as sellable stock at the source the moment it leaves the
+     * counter. Returns null on success, or a message to show the dispatcher.
+     */
+    suspend fun dispatchTransfer(transfer: BranchTransfer): String? = withContext(Dispatchers.IO) {
+        try {
+            postgrest["branch_transfers"].insert(transfer)
+            if (transfer.item_type == "Serialized") {
+                postgrest["retail_gadgets"].update({ set("status", "In Transit") }) {
+                    filter { eq("imei_1", transfer.reference_identifier) }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            e.message ?: "Could not record the transfer."
+        }
+    }
+
+    /**
+     * Book an in-transit transfer in at the destination.
+     *
+     * This calls the `receive_branch_transfer` function rather than doing the
+     * moves here: switching the branch, restoring the status and closing the
+     * transfer have to happen together or not at all, and the database is the
+     * only place that can promise that.
+     */
+    suspend fun receiveTransfer(transferId: String, receiver: String): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                supabase.postgrest.rpc(
+                    "receive_branch_transfer",
+                    buildJsonObject {
+                        put("p_transfer_id", transferId)
+                        put("p_receiver", receiver)
+                    }
+                )
+                null
+            } catch (e: Exception) {
+                e.printStackTrace()
+                e.message ?: "Could not receive the transfer."
+            }
+        }
 
     // --- App releases (in-app updater) ---
     /** Newest published release, or null if none / offline. */

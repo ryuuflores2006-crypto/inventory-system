@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Logout
@@ -29,6 +30,7 @@ import com.ryuuflores2006.inventorysystem.ui.components.LivePill
 import com.ryuuflores2006.inventorysystem.ui.screens.BarcodeScanScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.BranchScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.HomeScreen
+import com.ryuuflores2006.inventorysystem.ui.screens.TransferScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.InventoryListScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.LoginScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.RegisterScreen
@@ -99,6 +101,7 @@ private val TABS = listOf(
     Tab("Stock", Icons.Default.Inventory2),
     Tab("Stock-In", Icons.Default.AddCircle),
     Tab("Repairs", Icons.Default.Build),
+    Tab("Transfer", Icons.Default.LocalShipping),
     Tab("Branches", Icons.Default.Storefront)
 )
 
@@ -215,7 +218,8 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
                 1 -> InventoryListScreen(onScanClick = openScanner)
                 2 -> StockInScreen(onScanClick = openScanner)
                 3 -> RepairTicketScreen(onScanClick = openScanner)
-                4 -> BranchScreen()
+                4 -> TransferScreen(onScanClick = openScanner)
+                5 -> BranchScreen()
             }
         }
     }
