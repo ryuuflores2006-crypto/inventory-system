@@ -1,6 +1,13 @@
 # Centralized Multi-Branch Inventory & Repair Management System
 
-An enterprise-grade inventory synchronization and repair tracking system designed for retail storefronts with multiple locations. It uses a single centralized Supabase PostgreSQL database to coordinate real-time stock levels, retail cashier checkouts, diagnostic repair workflows, and branch-to-branch logistics.
+An inventory synchronization and repair tracking system for retail storefronts with
+multiple locations. A single centralized Supabase PostgreSQL database coordinates
+real-time stock levels, retail cashier checkouts, diagnostic repair workflows, and
+branch-to-branch logistics, shared live between an Android app and a PC web dashboard.
+
+**Status:** the schema is deployed and running on the live Supabase project. The three
+stores — J-LOU GADGET CENTER (main), JEHABS CELLSHOP and J-HUB CELLSHOP — are set up and
+the system is empty and ready for real stock. Nothing else needs to be configured.
 
 ---
 
@@ -67,13 +74,13 @@ no schema change, no rebuild. Every other table references `branches.name` with
 *Built with Kotlin, Jetpack Compose, CameraX, and Google ML Kit.*
 * **Intended Users:** On-the-floor retail assistants and diagnostic technicians.
 * **Camera scanner:** Direct hardware camera binding to scan barcodes and 15-digit IMEIs in real-time.
-* **Stock-In receipts:** Quick input interfaces for receiving supplier shipments at the branch level, featuring standardized dropdown selections for Storage, RAM, and Suppliers to minimize manual typing.
+* **Stock-In receipts:** Quick input for receiving supplier shipments at the branch level, with dropdown pickers for Storage and RAM to minimize manual typing, and 15-digit IMEI validation.
 * **Ticket creation:** Rapid repair intakes for customer walk-ins.
 * **Branches tab:** Add a new store straight from the phone — it appears immediately in every dropdown here and on the PC dashboard.
 * **Staff sign-in:** The same Supabase account works on both platforms.
 
 ### 2. Next.js Web Dashboard (`/web-dashboard`)
-*Built with Next.js, React, TypeScript, and CSS Modules.*
+*Built with Next.js 16, React 19, TypeScript, and a hand-rolled CSS design system.*
 * **Intended Users:** Store managers, inventory auditors, and front-desk cashiers.
 * **Master Audits:** Searchable, branch-filtered tables showcasing real-time stock balances and low-stock warning limits, complete with a 1-click **Export to CSV/Spreadsheet** feature for printable inventory reports.
 * **Retail Cashier:** Interface to check out units. Scans cellphones out by changing status to `Sold` or decrements accessory quantity balances, generating receipts.
@@ -86,20 +93,35 @@ no schema change, no rebuild. Every other table references `branches.name` with
 
 ---
 
+## 🚀 First Run
+
+The database is already deployed, so day one looks like this:
+
+1. **Install the app.** Copy `builds/app-debug.apk` to the phone and install it (allow
+   "install from unknown sources"). Or open the dashboard in a browser.
+2. **Register a staff account.** Tap **Register** on either platform. The same account
+   works on both — sign in on the phone with what you registered on the PC.
+3. **Check your stores.** The three branches are already there. Add more any time from
+   the **Branches** tab on the phone or **Branch Manager** on the dashboard.
+4. **Start logging stock.** Use **Stock-In** on the phone (scan the IMEI with the camera)
+   or **Add device / Add part** on the dashboard. Everything appears on both instantly.
+
+**There is no demo or sample data anywhere.** The system starts empty on purpose — every
+device, part, ticket and transfer is real data your staff enters.
+
+---
+
 ## 🛠️ Installation & Setup
 
 ### Database Deployment (Supabase SQL Editor)
-Execute `supabase/schema.sql` once in your Supabase SQL Editor. It creates the enums,
-tables, indexes, triggers, the `receive_branch_transfer()` function and the Row Level
-Security policies.
+> Already done on the live project — you only need this to set up a second/fresh project.
 
-**There is no demo or sample data.** The only rows it inserts are the three real stores
-(J-LOU GADGET CENTER, JEHABS CELLSHOP, J-HUB CELLSHOP). Every device, part, ticket and
-transfer is added by staff through the apps.
+Execute `supabase/schema.sql` once in the Supabase SQL Editor. It creates the enums,
+tables, indexes, triggers, the `receive_branch_transfer()` function, the Row Level
+Security policies, and the three store rows. Re-running it **drops and recreates
+everything**, so never run it again once you have real data.
 
 RLS denies everything to anonymous clients, so both platforms require a staff sign-in.
-Create the first account from the **Register** screen on either the web dashboard or the
-Android app.
 
 ### Running the Web Dashboard
 1. Navigate to the `web-dashboard` directory.
@@ -119,6 +141,12 @@ Android app.
 1. Open the `/android-app` folder inside Android Studio.
 2. The project URL and anon key are already set in `com.ryuuflores2006.inventorysystem.data.SupabaseHelper` — change them there only if you point the app at another project.
 3. Sync Gradle and hit **Run** to launch the application on an emulator or physical testing device.
+4. A ready-to-install debug build is committed at `builds/app-debug.apk`. To rebuild it:
+   ```bash
+   cd android-app
+   ./gradlew assembleDebug
+   cp app/build/outputs/apk/debug/app-debug.apk ../builds/app-debug.apk
+   ```
 
 ### Deploying the Web Dashboard to Vercel
 Since this project uses Supabase, deploying to Vercel is seamless:
@@ -128,3 +156,35 @@ Since this project uses Supabase, deploying to Vercel is seamless:
 4. No environment variables are required — the client falls back to the baked-in project. Set `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` only if you want a different backend.
 5. Click **Deploy**. Vercel will build the web application and assign it a live URL (e.g., `https://your-project-name.vercel.app`).
 6. From then on, any commits pushed to the `main` branch on GitHub will be automatically deployed by Vercel.
+
+---
+
+## ✅ Verified Behaviour
+
+The following was tested end-to-end against the live project through the public anon key,
+i.e. the exact path both apps take. Test data was deleted afterwards.
+
+| Check | Result |
+| --- | --- |
+| Anonymous client can read any table | Blocked by RLS |
+| Anonymous client can insert | Blocked by RLS |
+| Staff registration auto-creates a profile | Trigger fires |
+| Staff sign-in | Works on both platforms |
+| Add a branch at runtime, then stock it | Device, part and ticket all accepted |
+| Duplicate IMEI | Rejected by unique constraint |
+| Allocate a part to a ticket | Stock 10 → 8, invoice ₱300 → ₱400 automatically |
+| Rename a branch | Cascades to all its devices, parts, tickets and transfers |
+| Receive a transfer | `receive_branch_transfer()` relocates the device atomically |
+
+---
+
+## 🔐 Security Notes
+
+* The **anon (publishable) key** is baked into both clients. That is by design — it is a
+  public key, and Row Level Security means it grants nothing until a staff member signs
+  in.
+* The **service_role key** and the **database password** are never in the app code or in
+  this repository. Keep them off the clients; they bypass RLS entirely.
+* Every table currently grants full access to any signed-in staff account. If you later
+  want cashiers restricted to their own branch, tighten the policies in section 12 of
+  `supabase/schema.sql` using the `role` and `branch_name` columns already on `profiles`.
