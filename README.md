@@ -79,6 +79,7 @@ no schema change, no rebuild. Every other table references `branches.name` with
 * **Stock-In receipts:** Quick input for receiving supplier shipments at the branch level, with dropdown pickers for Storage and RAM to minimize manual typing, and 15-digit IMEI validation.
 * **Ticket creation:** Rapid repair intakes for customer walk-ins.
 * **Transfers:** Scan a handset to check it out to another store — the unit names itself, states which branch holds it, and is refused if it is sold or already in transit. Dispatching marks it `In Transit` so it stops counting as sellable at the source; the destination books it in from the same screen, which is the only moment the branch actually changes (done atomically by the `receive_branch_transfer` database function). Parts move the same way, by SKU and quantity.
+* **Removing mistakes:** Expand any device or part in the Inventory list for a **Remove from inventory** button, behind a confirmation. A unit that is sold or in transit is refused with the reason, and the database refuses a part a repair has already consumed — so a wrong IMEI typed at intake can be cleared, but the day's takings cannot be quietly rewritten.
 * **Branches tab:** Add a new store straight from the phone — it appears immediately in every dropdown here and on the PC dashboard, with live device / part / open-repair counts per store.
 * **Home dashboard:** Landing screen with branch filter chips, four live stat cards, a reorder-soon list and the repairs currently in progress.
 * **Live sync:** One Supabase realtime subscription for the whole session. Anything anyone changes — on another phone or on the PC — redraws the screen you are looking at. The header shows a **LIVE** pill while the socket is up.
@@ -89,9 +90,10 @@ no schema change, no rebuild. Every other table references `branches.name` with
 *Built with Next.js 16, React 19, TypeScript, and a hand-rolled CSS design system.*
 * **Intended Users:** Store managers, inventory auditors, and front-desk cashiers.
 * **Master Audits:** Searchable, branch-filtered tables showcasing real-time stock balances and low-stock warning limits, complete with a 1-click **Export to CSV/Spreadsheet** feature for printable inventory reports.
-* **Retail Cashier:** Interface to check out units. Scans cellphones out by changing status to `Sold` or decrements accessory quantity balances, generating receipts.
+* **Retail Cashier:** Pick the phone or accessory the customer is buying — every sellable item across all stores is in the one list, and the branch it leaves is read off the item, so a cashier is never staring at an empty dropdown because the register was set to the wrong store. Confirming marks a handset `Sold` or decrements the accessory balance and prints a receipt.
 * **Service Board:** Interactive technician board to track repair diagnostics, change status, and allocate repair parts.
-* **Logistics hub:** Form to dispatch branch-to-branch transfers. Shows transit statuses and handles receiving approvals to automatically update inventory location balances.
+* **Logistics hub:** Dispatch branch-to-branch transfers by choosing the item first — the store it is leaving fills itself in, and only the other stores are offered as destinations. Shows transit statuses and handles receiving approvals to automatically update inventory location balances.
+* **Deleting stock:** A bin button on every row of the audit tables removes a device or part outright, after a confirmation. Sold, in-transit, transferred or repair-consumed rows are refused with the reason.
 * **Branch Manager:** Add, rename, re-flag the main store, or archive a branch, with per-store device / part / open-repair counts.
 * **Add forms:** Devices (with IMEI validation), parts and accessories (restocks an existing SKU at that branch instead of duplicating it), and repair tickets — all addable from the browser.
 * **Analytics:** Breakdown of store performance, ticket status distributions, and cumulative revenue, computed per branch from the live branch list.
