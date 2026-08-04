@@ -32,7 +32,16 @@ object SupabaseHelper {
                 supabaseKey = SUPABASE_ANON_KEY
             ) {
                 install(Postgrest)
-                install(Auth) {}
+                install(Auth) {
+                    // Staff sign in once on a shop phone and stay signed in.
+                    // These are the library defaults on Android — the session
+                    // is kept in the app's own private storage and the access
+                    // token renewed in the background — but they are spelled
+                    // out because the counter depends on them.
+                    autoLoadFromStorage = true
+                    autoSaveToStorage = true
+                    alwaysAutoRefresh = true
+                }
                 install(Realtime)
                 install(Functions)
             }

@@ -64,14 +64,26 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-enum class Screen { LOGIN, REGISTER, MAIN }
+enum class Screen { STARTING, LOGIN, REGISTER, MAIN }
 
 @Composable
 fun MainApp() {
-    var currentScreen by remember { mutableStateOf(Screen.LOGIN) }
+    // Start on a blank splash, not on the login form. The saved session is on
+    // disk and takes a moment to load; showing the form first and correcting
+    // it afterwards is what made the app look like it had forgotten you.
+    var currentScreen by remember { mutableStateOf(Screen.STARTING) }
     val scope = rememberCoroutineScope()
 
+    LaunchedEffect(Unit) {
+        runCatching { SupabaseHelper.auth.awaitInitialization() }
+        currentScreen =
+            if (SupabaseHelper.auth.currentSessionOrNull() != null) Screen.MAIN else Screen.LOGIN
+    }
+
     when (currentScreen) {
+        // Nothing to draw yet — a flash of the wrong screen is worse than none.
+        Screen.STARTING -> Box(modifier = Modifier.fillMaxSize())
+
         Screen.LOGIN -> LoginScreen(
             onLoginSuccess = { currentScreen = Screen.MAIN },
             onNavigateToRegister = { currentScreen = Screen.REGISTER }
