@@ -17,6 +17,7 @@ import com.ryuuflores2006.inventorysystem.data.RepairPart
 import com.ryuuflores2006.inventorysystem.data.RetailGadget
 import com.ryuuflores2006.inventorysystem.data.ScanResolver
 import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
+import com.ryuuflores2006.inventorysystem.data.TacLookup
 import com.ryuuflores2006.inventorysystem.ui.components.*
 import com.ryuuflores2006.inventorysystem.ui.theme.Ash
 import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
@@ -87,7 +88,19 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
             is ScanResolver.Match.SameModel -> m.example
             is ScanResolver.Match.KnownSku -> m.example
             else -> null
-        } ?: return
+        }
+
+        if (example == null) {
+            // Nothing of ours matches. If it is an IMEI, the model code can
+            // still name the handset — first unit of a model we have never
+            // stocked, which is exactly the case worth filling in.
+            if (!scan.isImei) return
+            val named = TacLookup.identify(scan.value) ?: return
+            if (brand.isBlank()) named.brand?.let { brand = it }
+            if (model.isBlank()) named.model?.let { model = it }
+            named.label?.let { snackbar.showSnackbar("Looks like a $it — brand and model filled in.") }
+            return
+        }
 
         if (brand.isBlank()) brand = example.brand
         if (model.isBlank()) model = example.model
@@ -98,6 +111,17 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
 
         if (scan.match is ScanResolver.Match.SameModel) {
             snackbar.showSnackbar("Recognised as ${example.brand} ${example.model} — details filled in.")
+        }
+    }
+
+    // Typing the IMEI by hand should recognise the device just as scanning
+    // does — the camera is a shortcut, not the only way in. Fires once the
+    // 15th digit lands, and once per value.
+    var lastLookedUp by remember { mutableStateOf("") }
+    LaunchedEffect(imei1) {
+        if (imei1.length == 15 && imei1 != lastLookedUp) {
+            lastLookedUp = imei1
+            autofillFrom(imei1)
         }
     }
 

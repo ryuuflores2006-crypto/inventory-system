@@ -254,7 +254,19 @@ fun BarcodeScanScreen(
             }
         }
 
-        result?.let { scan ->
+        // A clean 15-digit IMEI needs no confirming — the check digit already
+        // proves it decoded correctly, so the number goes straight into the
+        // form and the scanner closes. Anything less certain (a short read, a
+        // SKU) still gets the card, so a misread never lands silently.
+        LaunchedEffect(result) {
+            val scan = result
+            if (scan != null && scan.isImei) {
+                camera?.cameraControl?.enableTorch(false)
+                onBarcodeScanned(scan.value)
+            }
+        }
+
+        result?.takeIf { !it.isImei }?.let { scan ->
             ScanResultCard(
                 scan = scan,
                 modifier = Modifier.align(Alignment.BottomCenter),

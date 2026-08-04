@@ -73,7 +73,9 @@ no schema change, no rebuild. Every other table references `branches.name` with
 ### 1. Android Mobile Application (`/android-app`)
 *Built with Kotlin, Jetpack Compose, CameraX, and Google ML Kit.*
 * **Intended Users:** On-the-floor retail assistants and diagnostic technicians.
-* **Camera scanner:** Direct hardware camera binding to scan barcodes and 15-digit IMEIs in real-time.
+* **Camera scanner that names the device:** Direct hardware camera binding for barcodes and 15-digit IMEIs, with a torch toggle. The moment a code is read the preview freezes and a card says what it is — IMEI (Luhn-checked) or SKU — and which unit, part or open repair it belongs to. A code from a model you already stock is recognised by its TAC (the first 8 IMEI digits, shared by every handset of that model), entirely offline.
+* **First-time model lookup:** For a model nobody has stocked before, the app asks the `tac-lookup` Supabase Edge Function, which names it from the TAC and caches the answer in `tac_catalog` for every device and both platforms. The provider key lives only in the function's secrets — never in the APK — and each model costs at most one lookup ever.
+* **Scan-to-fill:** Scanning in Stock-In fills the blank brand / model / storage / RAM / SKU / price fields from the recognised model and warns if that IMEI is already logged; scanning in a repair intake fills the device model.
 * **Stock-In receipts:** Quick input for receiving supplier shipments at the branch level, with dropdown pickers for Storage and RAM to minimize manual typing, and 15-digit IMEI validation.
 * **Ticket creation:** Rapid repair intakes for customer walk-ins.
 * **Branches tab:** Add a new store straight from the phone — it appears immediately in every dropdown here and on the PC dashboard, with live device / part / open-repair counts per store.
