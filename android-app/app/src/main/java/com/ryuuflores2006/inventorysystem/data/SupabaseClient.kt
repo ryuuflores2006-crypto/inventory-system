@@ -3,6 +3,8 @@ package com.ryuuflores2006.inventorysystem.data
 import android.content.Context
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.functions.Functions
+import io.github.jan.supabase.functions.functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
@@ -29,6 +31,7 @@ object SupabaseHelper {
                 install(Postgrest)
                 install(Auth) {}
                 install(Realtime)
+                install(Functions)
             }
         }
     }

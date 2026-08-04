@@ -405,3 +405,28 @@ ALTER TABLE app_releases ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS app_releases_read ON app_releases;
 CREATE POLICY app_releases_read ON app_releases
     FOR SELECT TO authenticated USING (TRUE);
+
+-- ---------------------------------------------------------------------------
+-- 16. TAC catalog (what a scanned IMEI actually is)
+-- ---------------------------------------------------------------------------
+-- The first 8 digits of an IMEI are the Type Allocation Code, issued per model.
+-- The `tac-lookup` Edge Function fills this in from the provider once per model
+-- and every later scan of that model is answered from here — instantly, free,
+-- and shared by every phone and the PC dashboard.
+CREATE TABLE IF NOT EXISTS tac_catalog (
+    tac         CHAR(8) PRIMARY KEY,
+    brand       TEXT,
+    model       TEXT,
+    release_year INTEGER,
+    source      TEXT        NOT NULL DEFAULT 'hicelltek',
+    raw         JSONB,
+    looked_up_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE tac_catalog ENABLE ROW LEVEL SECURITY;
+
+-- Staff read it directly so a cached model needs no function call at all.
+-- Only the Edge Function (service role, which bypasses RLS) ever writes.
+DROP POLICY IF EXISTS tac_catalog_read ON tac_catalog;
+CREATE POLICY tac_catalog_read ON tac_catalog
+    FOR SELECT TO authenticated USING (TRUE);

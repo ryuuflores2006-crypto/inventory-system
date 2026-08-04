@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ryuuflores2006.inventorysystem.data.BranchStore
 import com.ryuuflores2006.inventorysystem.data.LiveStore
+import com.ryuuflores2006.inventorysystem.data.ScanResolver
 import com.ryuuflores2006.inventorysystem.data.ServiceTicket
 import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.ui.components.*
@@ -310,7 +311,16 @@ private fun RepairIntakeForm(
                 modifier = Modifier.weight(1f)
             )
             FilledTonalIconButton(
-                onClick = { onScanClick { scanned -> imeiSerial = scanned } },
+                onClick = {
+                    onScanClick { scanned ->
+                        imeiSerial = scanned
+                        // If we sold this handset, or one just like it, we
+                        // already know what it is — no need to type the model.
+                        if (deviceModel.isBlank()) {
+                            ScanResolver.resolve(scanned).deviceLabel?.let { deviceModel = it }
+                        }
+                    }
+                },
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                     containerColor = Ink600,
                     contentColor = Cyan

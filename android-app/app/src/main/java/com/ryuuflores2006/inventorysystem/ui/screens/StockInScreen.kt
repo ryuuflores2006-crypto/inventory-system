@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.ryuuflores2006.inventorysystem.data.BranchStore
 import com.ryuuflores2006.inventorysystem.data.RepairPart
 import com.ryuuflores2006.inventorysystem.data.RetailGadget
+import com.ryuuflores2006.inventorysystem.data.ScanResolver
 import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.ui.components.*
 import com.ryuuflores2006.inventorysystem.ui.theme.Ash
@@ -69,6 +70,36 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
 
     val imeiLooksWrong = imei1.isNotBlank() && imei1.length != 15
     val margin = (retailPrice.toDoubleOrNull() ?: 0.0) - (costPrice.toDoubleOrNull() ?: 0.0)
+
+    /**
+     * Copy what we already know about a scanned code into the empty fields.
+     * Anything the user has already typed is left alone — this only fills gaps.
+     */
+    suspend fun autofillFrom(scanned: String) {
+        val scan = ScanResolver.resolve(scanned)
+        val example = when (val m = scan.match) {
+            is ScanResolver.Match.Device -> {
+                snackbar.showSnackbar(
+                    "That IMEI is already logged as ${m.gadget.status.lowercase()} at ${m.gadget.current_branch}."
+                )
+                m.gadget
+            }
+            is ScanResolver.Match.SameModel -> m.example
+            is ScanResolver.Match.KnownSku -> m.example
+            else -> null
+        } ?: return
+
+        if (brand.isBlank()) brand = example.brand
+        if (model.isBlank()) model = example.model
+        if (storage.isBlank()) storage = example.storage
+        if (ram.isBlank()) ram = example.ram
+        if (sku.isBlank()) sku = example.sku
+        if (retailPrice.isBlank()) retailPrice = example.retail_price.toString()
+
+        if (scan.match is ScanResolver.Match.SameModel) {
+            snackbar.showSnackbar("Recognised as ${example.brand} ${example.model} — details filled in.")
+        }
+    }
 
     fun resetForm() {
         sku = ""; brand = ""; model = ""; storage = ""; ram = ""; color = ""
@@ -163,7 +194,15 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                         modifier = Modifier.weight(1f)
                     )
                     FilledTonalIconButton(
-                        onClick = { onScanClick { scanned -> imei1 = scanned.filter { it.isDigit() }.take(15) } },
+                        onClick = {
+                            onScanClick { scanned ->
+                                imei1 = scanned.filter { it.isDigit() }.take(15)
+                                // A scan we recognise fills in the rest of the
+                                // description, so receiving a repeat model is
+                                // one scan and a price.
+                                scope.launch { autofillFrom(scanned) }
+                            }
+                        },
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
                             containerColor = Ink600,
                             contentColor = Cyan
