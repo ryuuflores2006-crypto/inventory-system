@@ -74,6 +74,41 @@ fun TransferScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
         }
     }
 
+    // Nothing is selected yet, so help rather than scold. An exact IMEI is what
+    // a scan produces, but a person typing has a model name in their head, not
+    // fifteen digits — so match on anything printed on the shelf label and
+    // offer what is actually movable. With the box empty this is simply the
+    // stock list, which is the fastest way to send something without a scanner.
+    data class Candidate(val id: String, val title: String, val detail: String)
+
+    val suggestions: List<Candidate> = remember(reference, LiveStore.gadgets, LiveStore.parts, gadget, part) {
+        if (gadget != null || part != null) return@remember emptyList()
+        val q = reference.trim().lowercase()
+        fun hit(vararg fields: String) = q.isBlank() || fields.any { it.lowercase().contains(q) }
+
+        val devices = LiveStore.gadgets
+            .filter { it.status == "In Stock" }
+            .filter { hit(it.imei_1, it.imei_2.orEmpty(), it.brand, it.model, it.sku, it.color) }
+            .map {
+                Candidate(
+                    it.imei_1,
+                    "${it.brand} ${it.model}",
+                    "IMEI ${it.imei_1} · ${it.current_branch}"
+                )
+            }
+        val bulk = LiveStore.parts
+            .filter { it.stock_qty > 0 }
+            .filter { hit(it.sku, it.part_name) }
+            .map {
+                Candidate(
+                    it.sku,
+                    it.part_name,
+                    "SKU ${it.sku} · ${it.stock_qty} at ${it.branch_location}"
+                )
+            }
+        (devices + bulk).take(8)
+    }
+
     val source = gadget?.current_branch ?: part?.branch_location ?: ""
     val destinations = BranchStore.names.filter { it != source }
 
@@ -85,7 +120,8 @@ fun TransferScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
 
     val blocker: String? = when {
         reference.isBlank() -> null
-        gadget == null && part == null -> "Not in the system — nothing to transfer."
+        gadget == null && part == null && suggestions.isEmpty() ->
+            "Nothing movable matches that — check the spelling, or scan the box."
         gadget != null && gadget.status == "Sold" -> "This unit is already sold."
         gadget != null && gadget.status == "In Transit" -> "This unit is already on its way somewhere."
         part != null && part.stock_qty <= 0 -> "No stock of this part at ${part.branch_location}."
@@ -151,9 +187,9 @@ fun TransferScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
 
             AppTextField(
                 value = reference,
-                onValueChange = { reference = it.trim() },
-                label = "Scan the IMEI, or type an IMEI / part SKU",
-                placeholder = "Point the camera at the box",
+                onValueChange = { reference = it },
+                label = "Scan, or search your stock",
+                placeholder = "Model, IMEI, part name or SKU",
                 trailing = {
                     IconButton(onClick = { onScanClick { scanned -> reference = scanned } }) {
                         Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan", tint = Cyan)
@@ -181,6 +217,29 @@ fun TransferScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                     ),
                     tint = if (blocker == null) Emerald else Amber
                 )
+
+                suggestions.isNotEmpty() -> Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        if (reference.isBlank()) "Tap what you are sending" else "Did you mean",
+                        color = Ash,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    suggestions.forEach { candidate ->
+                        AppCard(
+                            onClick = { reference = candidate.id },
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Text(candidate.title, style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                candidate.detail,
+                                color = Ash,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
 
                 reference.isNotBlank() -> IdentifiedCard(
                     heading = "Not recognised",

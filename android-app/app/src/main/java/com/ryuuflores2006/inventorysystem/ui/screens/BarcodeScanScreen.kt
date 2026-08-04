@@ -125,6 +125,11 @@ fun BarcodeScanScreen(
                 val previewView = PreviewView(ctx)
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
 
+                // Only ever touched from the decode callback, which ML Kit posts
+                // to the main thread — one writer, so plain vars are enough.
+                var lastRead: String? = null
+                var agreements = 0
+
                 cameraProviderFuture.addListener({
                     val cameraProvider = cameraProviderFuture.get()
 
@@ -135,6 +140,12 @@ fun BarcodeScanScreen(
                     // Only the formats that actually appear on phone boxes,
                     // spare-part bags and supplier labels. A narrower list
                     // decodes faster and misreads less than ALL_FORMATS.
+                    //
+                    // ITF is deliberately absent. It carries no checksum and
+                    // has no start/stop guard a decoder can trust, so a partly
+                    // framed Code 128 IMEI strip can come back as a shorter,
+                    // perfectly plausible ITF number — a wrong IMEI that looks
+                    // right. Nothing in the shop is labelled with ITF anyway.
                     val scannerOptions = BarcodeScannerOptions.Builder()
                         .setBarcodeFormats(
                             Barcode.FORMAT_CODE_128,
@@ -144,7 +155,6 @@ fun BarcodeScanScreen(
                             Barcode.FORMAT_EAN_8,
                             Barcode.FORMAT_UPC_A,
                             Barcode.FORMAT_UPC_E,
-                            Barcode.FORMAT_ITF,
                             Barcode.FORMAT_QR_CODE,
                             Barcode.FORMAT_DATA_MATRIX
                         )
@@ -152,7 +162,10 @@ fun BarcodeScanScreen(
                     val scanner = BarcodeScanning.getClient(scannerOptions)
 
                     val imageAnalysis = ImageAnalysis.Builder()
-                        .setTargetResolution(Size(1280, 720))
+                        // An IMEI strip is a long run of thin bars. At 720p the
+                        // narrowest ones land on barely a pixel and the decoder
+                        // starts inventing digits; 1080p gives it room.
+                        .setTargetResolution(Size(1920, 1080))
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
 
@@ -169,7 +182,23 @@ fun BarcodeScanScreen(
                         scanner.process(image)
                             .addOnSuccessListener { barcodes ->
                                 val raw = barcodes.firstNotNullOfOrNull { it.rawValue?.takeIf(String::isNotBlank) }
-                                if (raw != null && claimed.compareAndSet(false, true)) {
+                                if (raw == null) {
+                                    // Lost it. Start the agreement count over so
+                                    // two halves of two different reads can never
+                                    // add up to a confirmation.
+                                    lastRead = null
+                                    agreements = 0
+                                    return@addOnSuccessListener
+                                }
+                                // One frame is a guess. A blurred or half-framed
+                                // strip decodes to something different each time,
+                                // while a real code decodes to the same digits
+                                // over and over — so wait for two frames to agree
+                                // before believing it. At ~20fps this costs a
+                                // fraction of a second and removes nearly every
+                                // one-off misread.
+                                if (raw == lastRead) agreements++ else { lastRead = raw; agreements = 1 }
+                                if (agreements >= 2 && claimed.compareAndSet(false, true)) {
                                     view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                                     result = ScanResolver.resolve(raw)
                                 }
