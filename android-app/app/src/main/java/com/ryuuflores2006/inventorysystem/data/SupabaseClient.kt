@@ -177,6 +177,19 @@ object SupabaseHelper {
         }
     }
 
+    suspend fun updateGadget(gadget: RetailGadget): String? = withContext(Dispatchers.IO) {
+        val id = gadget.item_id ?: return@withContext "This unit does not have an ID."
+        try {
+            postgrest["retail_gadgets"].update(gadget) {
+                filter { eq("item_id", id) }
+            }
+            null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            e.message ?: "Could not update this unit."
+        }
+    }
+
     /**
      * Remove a unit that should never have been logged — a mis-typed IMEI at
      * intake, a duplicate.
@@ -242,6 +255,19 @@ object SupabaseHelper {
         } catch (e: Exception) {
             e.printStackTrace()
             false
+        }
+    }
+
+    suspend fun updatePart(part: RepairPart): String? = withContext(Dispatchers.IO) {
+        val id = part.part_id ?: return@withContext "This part does not have an ID."
+        try {
+            postgrest["repair_parts"].update(part) {
+                filter { eq("part_id", id) }
+            }
+            null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            e.message ?: "Could not update this part."
         }
     }
 

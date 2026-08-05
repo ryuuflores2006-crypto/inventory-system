@@ -6,11 +6,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -175,6 +178,7 @@ fun InventoryListScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
 @Composable
 fun GadgetItemCard(gadget: RetailGadget) {
     var expanded by remember { mutableStateOf(false) }
+    var showEdit by remember { mutableStateOf(false) }
 
     AppCard(onClick = { expanded = !expanded }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -219,7 +223,8 @@ fun GadgetItemCard(gadget: RetailGadget) {
                     "Sold", "In Transit" -> "A ${gadget.status.lowercase()} unit cannot be deleted."
                     else -> null
                 },
-                onConfirm = { SupabaseHelper.deleteGadget(gadget) }
+                onConfirm = { SupabaseHelper.deleteGadget(gadget) },
+                onEdit = { showEdit = true }
             )
         } else {
             Text(
@@ -230,11 +235,24 @@ fun GadgetItemCard(gadget: RetailGadget) {
             )
         }
     }
+
+    if (showEdit) {
+        EditGadgetDialog(
+            gadget = gadget,
+            onDismiss = { showEdit = false },
+            onSave = { updated ->
+                val err = SupabaseHelper.updateGadget(updated)
+                if (err == null) LiveStore.refresh()
+                err
+            }
+        )
+    }
 }
 
 @Composable
 fun PartItemCard(part: RepairPart) {
     var expanded by remember { mutableStateOf(false) }
+    var showEdit by remember { mutableStateOf(false) }
     val isLow = part.stock_qty <= part.minimum_stock_threshold
     val stockColor = when {
         part.stock_qty == 0 -> Rose
@@ -284,9 +302,22 @@ fun PartItemCard(part: RepairPart) {
                 what = part.part_name,
                 detail = "${part.sku} at ${part.branch_location}",
                 blocked = null,
-                onConfirm = { SupabaseHelper.deletePart(part) }
+                onConfirm = { SupabaseHelper.deletePart(part) },
+                onEdit = { showEdit = true }
             )
         }
+    }
+
+    if (showEdit) {
+        EditPartDialog(
+            part = part,
+            onDismiss = { showEdit = false },
+            onSave = { updated ->
+                val err = SupabaseHelper.updatePart(updated)
+                if (err == null) LiveStore.refresh()
+                err
+            }
+        )
     }
 }
 
@@ -300,7 +331,8 @@ private fun RemoveRow(
     what: String,
     detail: String,
     blocked: String?,
-    onConfirm: suspend () -> String?
+    onConfirm: suspend () -> String?,
+    onEdit: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var asking by remember { mutableStateOf(false) }
@@ -318,10 +350,21 @@ private fun RemoveRow(
         Text(it, style = MaterialTheme.typography.bodySmall, color = Rose)
     }
 
-    TextButton(onClick = { asking = true }, enabled = !busy) {
-        Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = Rose)
-        Spacer(Modifier.width(6.dp))
-        Text("Remove from inventory", color = Rose)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TextButton(onClick = { asking = true }, enabled = !busy) {
+            Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = Rose)
+            Spacer(Modifier.width(6.dp))
+            Text("Remove", color = Rose)
+        }
+        TextButton(onClick = onEdit, enabled = !busy) {
+            Icon(Icons.Default.Edit, contentDescription = null)
+            Spacer(Modifier.width(6.dp))
+            Text("Edit")
+        }
     }
 
     if (asking) {
@@ -349,4 +392,138 @@ private fun RemoveRow(
             }
         )
     }
+}
+
+@Composable
+fun EditGadgetDialog(
+    gadget: RetailGadget,
+    onDismiss: () -> Unit,
+    onSave: suspend (RetailGadget) -> String?
+) {
+    var sku by remember { mutableStateOf(gadget.sku) }
+    var brand by remember { mutableStateOf(gadget.brand) }
+    var model by remember { mutableStateOf(gadget.model) }
+    var storage by remember { mutableStateOf(gadget.storage) }
+    var ram by remember { mutableStateOf(gadget.ram) }
+    var color by remember { mutableStateOf(gadget.color) }
+    var costPrice by remember { mutableStateOf(gadget.cost_price.toString()) }
+    var retailPrice by remember { mutableStateOf(gadget.retail_price.toString()) }
+    var imei1 by remember { mutableStateOf(gadget.imei_1) }
+    var imei2 by remember { mutableStateOf(gadget.imei_2 ?: "") }
+    var supplier by remember { mutableStateOf(gadget.supplier_name ?: "") }
+    
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Edit Device") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                error?.let { Text(it, color = Rose, style = MaterialTheme.typography.bodySmall) }
+                OutlinedTextField(value = sku, onValueChange = { sku = it }, label = { Text("SKU") })
+                OutlinedTextField(value = brand, onValueChange = { brand = it }, label = { Text("Brand") })
+                OutlinedTextField(value = model, onValueChange = { model = it }, label = { Text("Model") })
+                OutlinedTextField(value = storage, onValueChange = { storage = it }, label = { Text("Storage") })
+                OutlinedTextField(value = ram, onValueChange = { ram = it }, label = { Text("RAM") })
+                OutlinedTextField(value = color, onValueChange = { color = it }, label = { Text("Color") })
+                OutlinedTextField(value = costPrice, onValueChange = { costPrice = it }, label = { Text("Cost Price") })
+                OutlinedTextField(value = retailPrice, onValueChange = { retailPrice = it }, label = { Text("Retail Price") })
+                OutlinedTextField(value = imei1, onValueChange = { imei1 = it }, label = { Text("IMEI 1") })
+                OutlinedTextField(value = imei2, onValueChange = { imei2 = it }, label = { Text("IMEI 2") })
+                OutlinedTextField(value = supplier, onValueChange = { supplier = it }, label = { Text("Supplier") })
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !saving,
+                onClick = {
+                    scope.launch {
+                        saving = true
+                        val updated = gadget.copy(
+                            sku = sku,
+                            brand = brand,
+                            model = model,
+                            storage = storage,
+                            ram = ram,
+                            color = color,
+                            cost_price = costPrice.toDoubleOrNull() ?: 0.0,
+                            retail_price = retailPrice.toDoubleOrNull() ?: 0.0,
+                            imei_1 = imei1,
+                            imei_2 = imei2.takeIf { it.isNotBlank() },
+                            supplier_name = supplier.takeIf { it.isNotBlank() }
+                        )
+                        val err = onSave(updated)
+                        saving = false
+                        if (err != null) error = err else onDismiss()
+                    }
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+fun EditPartDialog(
+    part: RepairPart,
+    onDismiss: () -> Unit,
+    onSave: suspend (RepairPart) -> String?
+) {
+    var sku by remember { mutableStateOf(part.sku) }
+    var name by remember { mutableStateOf(part.part_name) }
+    var models by remember { mutableStateOf(part.compatible_models.joinToString(", ")) }
+    var qty by remember { mutableStateOf(part.stock_qty.toString()) }
+    var minQty by remember { mutableStateOf(part.minimum_stock_threshold.toString()) }
+    var costPrice by remember { mutableStateOf(part.cost_price.toString()) }
+    var servicePrice by remember { mutableStateOf(part.service_price.toString()) }
+    
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Edit Part") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                error?.let { Text(it, color = Rose, style = MaterialTheme.typography.bodySmall) }
+                OutlinedTextField(value = sku, onValueChange = { sku = it }, label = { Text("SKU") })
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Part Name") })
+                OutlinedTextField(value = models, onValueChange = { models = it }, label = { Text("Compatible Models (comma separated)") })
+                OutlinedTextField(value = qty, onValueChange = { qty = it }, label = { Text("Stock Quantity") })
+                OutlinedTextField(value = minQty, onValueChange = { minQty = it }, label = { Text("Min Threshold") })
+                OutlinedTextField(value = costPrice, onValueChange = { costPrice = it }, label = { Text("Cost Price") })
+                OutlinedTextField(value = servicePrice, onValueChange = { servicePrice = it }, label = { Text("Service Price") })
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !saving,
+                onClick = {
+                    scope.launch {
+                        saving = true
+                        val updated = part.copy(
+                            sku = sku,
+                            part_name = name,
+                            compatible_models = models.split(",").map { it.trim() }.filter { it.isNotBlank() },
+                            stock_qty = qty.toIntOrNull() ?: 0,
+                            minimum_stock_threshold = minQty.toIntOrNull() ?: 0,
+                            cost_price = costPrice.toDoubleOrNull() ?: 0.0,
+                            service_price = servicePrice.toDoubleOrNull() ?: 0.0
+                        )
+                        val err = onSave(updated)
+                        saving = false
+                        if (err != null) error = err else onDismiss()
+                    }
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancel") }
+        }
+    )
 }
