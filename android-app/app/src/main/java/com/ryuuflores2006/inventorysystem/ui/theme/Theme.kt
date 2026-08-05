@@ -12,12 +12,14 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.lightColorScheme
+
 /**
- * The app is dark-only on purpose: it is used on a shop counter under
- * fluorescent light where a bright screen washes out, and a fixed scheme lets
- * the design rely on exact contrast values.
+ * Premium, modern aesthetic with glassmorphism and vibrant accents.
+ * Now supports both Light and Dark mode.
  */
-private val AppColorScheme = darkColorScheme(
+private val AppDarkColorScheme = darkColorScheme(
     primary = Cyan,
     onPrimary = DeepSpace,
     primaryContainer = CyanDeep,
@@ -52,6 +54,41 @@ private val AppColorScheme = darkColorScheme(
     scrim = DeepSpace
 )
 
+private val AppLightColorScheme = lightColorScheme(
+    primary = AzureDark,
+    onPrimary = LightBackground,
+    primaryContainer = CyanDeep,
+    onPrimaryContainer = Chalk,
+
+    secondary = Azure,
+    onSecondary = LightBackground,
+    secondaryContainer = LightSurfaceRaised,
+    onSecondaryContainer = Ink,
+
+    tertiary = VioletDark,
+    onTertiary = Chalk,
+
+    background = LightBackground,
+    onBackground = Ink,
+
+    surface = LightSurface,
+    onSurface = Ink,
+    surfaceVariant = LightSurfaceRaised,
+    onSurfaceVariant = Slate,
+    surfaceContainer = LightSurface,
+    surfaceContainerHigh = LightSurfaceRaised,
+    surfaceContainerHighest = LightSurfaceRaised,
+
+    error = RoseDark,
+    onError = Chalk,
+    errorContainer = LightSurfaceRaised,
+    onErrorContainer = RoseDark,
+
+    outline = LightBorder,
+    outlineVariant = LightSurfaceRaised,
+    scrim = LightBackground
+)
+
 val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
@@ -61,22 +98,26 @@ val AppShapes = Shapes(
 )
 
 @Composable
-fun InventorySystemTheme(content: @Composable () -> Unit) {
+fun InventorySystemTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
+    val colorScheme = if (darkTheme) AppDarkColorScheme else AppLightColorScheme
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = DeepSpace.toArgb()
-            window.navigationBarColor = GlassBase.toArgb()
+            window.statusBarColor = if (darkTheme) DeepSpace.toArgb() else LightBackground.toArgb()
+            window.navigationBarColor = if (darkTheme) GlassBase.toArgb() else LightBase.toArgb()
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = false
+                isAppearanceLightStatusBars = !darkTheme
+                isAppearanceLightNavigationBars = !darkTheme
             }
         }
     }
 
     MaterialTheme(
-        colorScheme = AppColorScheme,
+        colorScheme = colorScheme,
         typography = AppTypography,
         shapes = AppShapes,
         content = content

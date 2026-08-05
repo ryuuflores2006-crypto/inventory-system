@@ -1,5 +1,6 @@
 package com.ryuuflores2006.inventorysystem.ui.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
