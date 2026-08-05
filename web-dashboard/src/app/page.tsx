@@ -157,7 +157,9 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [showDeviceModal, setShowDeviceModal] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<RetailGadget | null>(null);
   const [showPartModal, setShowPartModal] = useState(false);
+  const [editingPart, setEditingPart] = useState<RepairPart | null>(null);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [allocateTarget, setAllocateTarget] = useState<ServiceTicket | null>(null);
@@ -575,7 +577,15 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                 <button
                   className="btn btn-primary"
                   disabled={!hasBranches}
-                  onClick={() => (inventorySubTab === 'serialized' ? setShowDeviceModal(true) : setShowPartModal(true))}
+                  onClick={() => {
+                    if (inventorySubTab === 'serialized') {
+                      setEditingDevice(null);
+                      setShowDeviceModal(true);
+                    } else {
+                      setEditingPart(null);
+                      setShowPartModal(true);
+                    }
+                  }}
                 >
                   <Plus size={16} />
                   {inventorySubTab === 'serialized' ? 'Add device' : 'Add / restock part'}
@@ -660,7 +670,19 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                         <td style={{ fontSize: '0.9rem' }}>{peso(g.cost_price)}</td>
                         <td style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>{peso(g.retail_price)}</td>
                         <td>
-                          <RowDelete label={`Delete ${g.brand} ${g.model}`} onClick={() => deleteGadget(g)} />
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button
+                              className="btn btn-secondary"
+                              style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                              onClick={() => {
+                                setEditingDevice(g);
+                                setShowDeviceModal(true);
+                              }}
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <RowDelete label={`Delete ${g.brand} ${g.model}`} onClick={() => deleteGadget(g)} />
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -713,7 +735,19 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                           <td style={{ fontSize: '0.9rem' }}>{peso(p.cost_price)}</td>
                           <td style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>{peso(p.service_price)}</td>
                           <td>
-                            <RowDelete label={`Delete ${p.part_name}`} onClick={() => deletePart(p)} />
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                className="btn btn-secondary"
+                                style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                                onClick={() => {
+                                  setEditingPart(p);
+                                  setShowPartModal(true);
+                                }}
+                              >
+                                <Pencil size={13} />
+                              </button>
+                              <RowDelete label={`Delete ${p.part_name}`} onClick={() => deletePart(p)} />
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1199,6 +1233,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
         <DeviceModal
           branches={branchNames}
           defaultBranch={selectedBranch === ALL_BRANCHES ? branchNames[0] ?? '' : selectedBranch}
+          editDevice={editingDevice}
           onClose={() => setShowDeviceModal(false)}
           onSaved={async () => {
             setShowDeviceModal(false);
@@ -1213,6 +1248,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
           branches={branchNames}
           existing={parts}
           defaultBranch={selectedBranch === ALL_BRANCHES ? branchNames[0] ?? '' : selectedBranch}
+          editPart={editingPart}
           onClose={() => setShowPartModal(false)}
           onSaved={async () => {
             setShowPartModal(false);
@@ -1440,29 +1476,31 @@ function BranchModal({
 function DeviceModal({
   branches,
   defaultBranch,
+  editDevice,
   onClose,
   onSaved,
   notify,
 }: {
   branches: string[];
   defaultBranch: string;
+  editDevice?: RetailGadget | null;
   onClose: () => void;
   onSaved: () => void;
   notify: Notify;
 }) {
   const [f, setF] = useState({
-    sku: '',
-    brand: '',
-    model: '',
-    storage: '',
-    ram: '',
-    color: '',
-    cost_price: '',
-    retail_price: '',
-    imei_1: '',
-    imei_2: '',
-    supplier_name: '',
-    current_branch: defaultBranch,
+    sku: editDevice?.sku ?? '',
+    brand: editDevice?.brand ?? '',
+    model: editDevice?.model ?? '',
+    storage: editDevice?.storage ?? '',
+    ram: editDevice?.ram ?? '',
+    color: editDevice?.color ?? '',
+    cost_price: editDevice?.cost_price.toString() ?? '',
+    retail_price: editDevice?.retail_price.toString() ?? '',
+    imei_1: editDevice?.imei_1 ?? '',
+    imei_2: editDevice?.imei_2 ?? '',
+    supplier_name: editDevice?.supplier_name ?? '',
+    current_branch: editDevice?.current_branch ?? defaultBranch,
   });
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -1486,7 +1524,7 @@ function DeviceModal({
     }
 
     setBusy(true);
-    const { error } = await supabase.from('retail_gadgets').insert({
+    const payload = {
       sku: f.sku.trim(),
       brand: f.brand.trim(),
       model: f.model.trim(),
@@ -1496,22 +1534,25 @@ function DeviceModal({
       cost_price: cost,
       retail_price: retail,
       current_branch: f.current_branch,
-      status: 'In Stock',
+      status: editDevice ? editDevice.status : 'In Stock',
       imei_1: f.imei_1,
       imei_2: f.imei_2 || null,
       supplier_name: f.supplier_name.trim() || null,
-    });
+    };
+    const { error } = editDevice
+      ? await supabase.from('retail_gadgets').update(payload).eq('item_id', editDevice.item_id)
+      : await supabase.from('retail_gadgets').insert(payload);
     setBusy(false);
     if (error) {
       notify('err', error.message.includes('duplicate') ? 'That IMEI is already registered.' : error.message);
       return;
     }
-    notify('ok', `${f.brand} ${f.model} added to ${f.current_branch}.`);
+    notify('ok', editDevice ? `Device updated.` : `${f.brand} ${f.model} added to ${f.current_branch}.`);
     onSaved();
   };
 
   return (
-    <Modal title="Add serialized device" width={560} onClose={onClose}>
+    <Modal title={editDevice ? 'Edit serialized device' : 'Add serialized device'} width={560} onClose={onClose}>
       <form onSubmit={submit}>
         <Field label="Receiving branch *">
           <select className="form-input" value={f.current_branch} onChange={set('current_branch')} required>
@@ -1557,7 +1598,7 @@ function DeviceModal({
         <Field label="Supplier (optional)">
           <input className="form-input" value={f.supplier_name} onChange={set('supplier_name')} />
         </Field>
-        <ModalActions onCancel={onClose} busy={busy} submitLabel="Add device" />
+        <ModalActions onCancel={onClose} busy={busy} submitLabel={editDevice ? 'Save changes' : 'Add device'} />
       </form>
     </Modal>
   );
@@ -1571,6 +1612,7 @@ function PartModal({
   branches,
   existing,
   defaultBranch,
+  editPart,
   onClose,
   onSaved,
   notify,
@@ -1578,22 +1620,23 @@ function PartModal({
   branches: string[];
   existing: RepairPart[];
   defaultBranch: string;
+  editPart?: RepairPart | null;
   onClose: () => void;
   onSaved: () => void;
   notify: Notify;
 }) {
-  const [branch, setBranch] = useState(defaultBranch);
-  const [sku, setSku] = useState('');
-  const [partName, setPartName] = useState('');
-  const [compat, setCompat] = useState('');
-  const [qty, setQty] = useState('1');
-  const [minQty, setMinQty] = useState('5');
-  const [cost, setCost] = useState('');
-  const [service, setService] = useState('');
+  const [branch, setBranch] = useState(editPart?.branch_location ?? defaultBranch);
+  const [sku, setSku] = useState(editPart?.sku ?? '');
+  const [partName, setPartName] = useState(editPart?.part_name ?? '');
+  const [compat, setCompat] = useState(editPart?.compatible_models?.join(', ') ?? '');
+  const [qty, setQty] = useState(editPart?.stock_qty.toString() ?? '1');
+  const [minQty, setMinQty] = useState(editPart?.minimum_stock_threshold.toString() ?? '5');
+  const [cost, setCost] = useState(editPart?.cost_price.toString() ?? '');
+  const [service, setService] = useState(editPart?.service_price.toString() ?? '');
   const [busy, setBusy] = useState(false);
 
-  // If this SKU already exists at this branch we restock instead of duplicating.
-  const match = existing.find((p) => p.sku === sku.trim() && p.branch_location === branch);
+  // If this SKU already exists at this branch we restock instead of duplicating (only when adding new).
+  const match = !editPart ? existing.find((p) => p.sku === sku.trim() && p.branch_location === branch) : null;
 
   useEffect(() => {
     if (match) {
@@ -1615,39 +1658,53 @@ function PartModal({
       return;
     }
     setBusy(true);
-    const { error } = match
+    const { error } = editPart
       ? await supabase
           .from('repair_parts')
           .update({
-            stock_qty: match.stock_qty + addQty,
+            sku: sku.trim(),
             part_name: partName.trim(),
             compatible_models: compat.split(',').map((s) => s.trim()).filter(Boolean),
+            branch_location: branch,
+            stock_qty: addQty,
             minimum_stock_threshold: Number(minQty),
             cost_price: costN,
             service_price: serviceN,
           })
-          .eq('part_id', match.part_id)
-      : await supabase.from('repair_parts').insert({
-          sku: sku.trim(),
-          part_name: partName.trim(),
-          compatible_models: compat.split(',').map((s) => s.trim()).filter(Boolean),
-          branch_location: branch,
-          stock_qty: addQty,
-          minimum_stock_threshold: Number(minQty),
-          cost_price: costN,
-          service_price: serviceN,
-        });
+          .eq('part_id', editPart.part_id)
+      : match
+        ? await supabase
+            .from('repair_parts')
+            .update({
+              stock_qty: match.stock_qty + addQty,
+              part_name: partName.trim(),
+              compatible_models: compat.split(',').map((s) => s.trim()).filter(Boolean),
+              minimum_stock_threshold: Number(minQty),
+              cost_price: costN,
+              service_price: serviceN,
+            })
+            .eq('part_id', match.part_id)
+        : await supabase.from('repair_parts').insert({
+            sku: sku.trim(),
+            part_name: partName.trim(),
+            compatible_models: compat.split(',').map((s) => s.trim()).filter(Boolean),
+            branch_location: branch,
+            stock_qty: addQty,
+            minimum_stock_threshold: Number(minQty),
+            cost_price: costN,
+            service_price: serviceN,
+          });
     setBusy(false);
     if (error) {
       notify('err', error.message);
       return;
     }
-    notify('ok', match ? `Restocked ${sku} at ${branch} (+${addQty}).` : `${partName} added to ${branch}.`);
+    notify('ok', editPart ? `Part updated.` : match ? `Restocked ${sku} at ${branch} (+${addQty}).` : `${partName} added to ${branch}.`);
     onSaved();
   };
 
   return (
-    <Modal title="Add / restock part or accessory" width={560} onClose={onClose}>
+    <Modal title={editPart ? 'Edit part or accessory' : 'Add / restock part or accessory'} width={560} onClose={onClose}>
       <form onSubmit={submit}>
         <Field label="Branch *">
           <select className="form-input" value={branch} onChange={(e) => setBranch(e.target.value)} required>
@@ -1673,8 +1730,8 @@ function PartModal({
           <input className="form-input" value={compat} onChange={(e) => setCompat(e.target.value)} placeholder="iPhone 15 Pro, iPhone 15" />
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label={match ? 'Quantity to add *' : 'Starting quantity *'}>
-            <input className="form-input" type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} required />
+          <Field label={editPart ? 'Current stock *' : match ? 'Quantity to add *' : 'Starting quantity *'}>
+            <input className="form-input" type="number" min="0" value={qty} onChange={(e) => setQty(e.target.value)} required />
           </Field>
           <Field label="Low-stock alert level *">
             <input className="form-input" type="number" min="0" value={minQty} onChange={(e) => setMinQty(e.target.value)} required />
@@ -1686,7 +1743,7 @@ function PartModal({
             <input className="form-input" type="number" step="0.01" min="0" value={service} onChange={(e) => setService(e.target.value)} required />
           </Field>
         </div>
-        <ModalActions onCancel={onClose} busy={busy} submitLabel={match ? 'Restock' : 'Add part'} />
+        <ModalActions onCancel={onClose} busy={busy} submitLabel={editPart ? 'Save changes' : match ? 'Restock' : 'Add part'} />
       </form>
     </Modal>
   );
