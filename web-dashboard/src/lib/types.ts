@@ -131,5 +131,7 @@ export interface Sale {
   sold_at: string;
 }
 
-export const peso = (n: number | string) =>
-  `₱${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const peso = (n: number | string) => {
+  const formatted = Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `₱${formatted.endsWith('.00') ? formatted.slice(0, -3) : formatted}`;
+}

@@ -208,6 +208,7 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
                         onClick = { currentTab = index },
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
                         label = { Text(tab.label, style = MaterialTheme.typography.labelSmall) },
+                        alwaysShowLabel = false,
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,
                             selectedTextColor = MaterialTheme.colorScheme.primary,

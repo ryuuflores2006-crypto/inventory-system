@@ -12,8 +12,8 @@ android {
         applicationId = "com.ryuuflores2006.inventorysystem"
         minSdk = 26
         targetSdk = 34
-        versionCode = 16
-        versionName = "1.15"
+        versionCode = 17
+        versionName = "1.16"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -84,6 +84,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
+
 
 
 
