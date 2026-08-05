@@ -224,9 +224,13 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
     const ticketRev = scopedTickets
       .filter((t) => t.ticket_status === 'Completed')
       .reduce((s, t) => s + Number(t.total_amount), 0);
-    const deviceRev = scopedGadgets
-      .filter((g) => g.status === 'Sold')
-      .reduce((s, g) => s + Number(g.retail_price), 0);
+    // Takings come from what was rung up, not from what a status field says.
+    // Adding up retail_price of everything marked Sold counted list prices that
+    // were never charged, missed every discount, and moved when someone edited
+    // a price months later.
+    const deviceRev = sales
+      .filter((s) => s.status === 'Completed' && matchBranch(s.branch_location))
+      .reduce((s, sale) => s + Number(sale.total_amount), 0);
 
     return {
       inStock: scopedGadgets.filter((g) => g.status === 'In Stock').length,
@@ -234,7 +238,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
       lowStock: scopedParts.filter((p) => p.stock_qty <= p.minimum_stock_threshold).length,
       revenue: ticketRev + deviceRev,
     };
-  }, [gadgets, tickets, parts, selectedBranch]);
+  }, [gadgets, tickets, parts, sales, selectedBranch]);
 
   // -------------------------------------------------------------------------
   // Mutations
@@ -641,7 +645,12 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                               )
                             }
                           >
-                            {GADGET_STATUSES.map((s) => (
+                            {/* Sold is not something you set — it is what a
+                                sale leaves behind. Picking it here made money
+                                appear with no invoice, price or cashier, so it
+                                is only offered on a unit that already is one,
+                                to keep the dropdown from looking broken. */}
+                            {GADGET_STATUSES.filter((s) => s !== 'Sold' || g.status === 'Sold').map((s) => (
                               <option key={s} value={s}>
                                 {s}
                               </option>
@@ -1087,7 +1096,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
         {activeTab === 'analytics' && (
           <div className="glass-panel" style={{ padding: 24 }}>
             <h2>Revenue &amp; store performance</h2>
-            <p style={{ marginBottom: 24 }}>Completed repair invoices plus sold serialized devices.</p>
+            <p style={{ marginBottom: 24 }}>Completed repair invoices plus recorded sales.</p>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 30 }}>
               <div
@@ -1108,14 +1117,16 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                       tickets
                         .filter((t) => t.branch_location === b.name && t.ticket_status === 'Completed')
                         .reduce((s, t) => s + Number(t.total_amount), 0) +
-                      gadgets
-                        .filter((g) => g.current_branch === b.name && g.status === 'Sold')
-                        .reduce((s, g) => s + Number(g.retail_price), 0);
+                      sales
+                        .filter((s) => s.status === 'Completed' && s.branch_location === b.name)
+                        .reduce((s, sale) => s + Number(sale.total_amount), 0);
                     const grand =
                       tickets
                         .filter((t) => t.ticket_status === 'Completed')
                         .reduce((s, t) => s + Number(t.total_amount), 0) +
-                      gadgets.filter((g) => g.status === 'Sold').reduce((s, g) => s + Number(g.retail_price), 0);
+                      sales
+                        .filter((s) => s.status === 'Completed')
+                        .reduce((s, sale) => s + Number(sale.total_amount), 0);
                     const pct = grand > 0 ? (rev / grand) * 100 : 0;
                     return (
                       <div key={b.branch_id}>
