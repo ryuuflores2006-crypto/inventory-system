@@ -370,7 +370,7 @@ fun PrimaryButton(
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = com.ryuuflores2006.inventorysystem.ui.theme.MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.background,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -379,7 +379,7 @@ fun PrimaryButton(
             CircularProgressIndicator(
                 modifier = Modifier.size(18.dp),
                 strokeWidth = 2.dp,
-                color = com.ryuuflores2006.inventorysystem.ui.theme.MaterialTheme.colorScheme.background
+                color = MaterialTheme.colorScheme.background
             )
             Spacer(Modifier.width(10.dp))
         } else if (icon != null) {
@@ -435,7 +435,7 @@ fun EmptyState(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = com.ryuuflores2006.inventorysystem.ui.theme.MaterialTheme.colorScheme.background
+                    contentColor = MaterialTheme.colorScheme.background
                 )
             ) { Text(actionLabel) }
         }
