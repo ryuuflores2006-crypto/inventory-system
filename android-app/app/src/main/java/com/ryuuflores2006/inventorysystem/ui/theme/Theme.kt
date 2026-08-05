@@ -19,37 +19,37 @@ import androidx.core.view.WindowCompat
  */
 private val AppColorScheme = darkColorScheme(
     primary = Cyan,
-    onPrimary = Ink900,
+    onPrimary = DeepSpace,
     primaryContainer = CyanDeep,
     onPrimaryContainer = Chalk,
 
     secondary = CyanSoft,
-    onSecondary = Ink900,
-    secondaryContainer = Ink600,
+    onSecondary = DeepSpace,
+    secondaryContainer = GlassSurfaceRaised,
     onSecondaryContainer = Chalk,
 
     tertiary = Violet,
     onTertiary = Chalk,
 
-    background = Ink900,
+    background = DeepSpace,
     onBackground = Chalk,
 
-    surface = Ink700,
+    surface = GlassSurface,
     onSurface = Chalk,
-    surfaceVariant = Ink600,
+    surfaceVariant = GlassSurfaceRaised,
     onSurfaceVariant = Ash,
-    surfaceContainer = Ink700,
-    surfaceContainerHigh = Ink600,
-    surfaceContainerHighest = Ink600,
+    surfaceContainer = GlassSurface,
+    surfaceContainerHigh = GlassSurfaceRaised,
+    surfaceContainerHighest = GlassSurfaceRaised,
 
     error = Rose,
     onError = Chalk,
-    errorContainer = Ink600,
+    errorContainer = GlassSurfaceRaised,
     onErrorContainer = Rose,
 
-    outline = Ink500,
-    outlineVariant = Ink600,
-    scrim = Ink900
+    outline = GlassBorder,
+    outlineVariant = GlassSurfaceRaised,
+    scrim = DeepSpace
 )
 
 val AppShapes = Shapes(
@@ -66,8 +66,8 @@ fun InventorySystemTheme(content: @Composable () -> Unit) {
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = Ink900.toArgb()
-            window.navigationBarColor = Ink800.toArgb()
+            window.statusBarColor = DeepSpace.toArgb()
+            window.navigationBarColor = GlassBase.toArgb()
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = false
                 isAppearanceLightNavigationBars = false

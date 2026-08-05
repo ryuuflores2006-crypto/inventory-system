@@ -12,9 +12,9 @@ import androidx.compose.ui.unit.dp
 import com.ryuuflores2006.inventorysystem.data.UpdateManager
 import com.ryuuflores2006.inventorysystem.ui.theme.Ash
 import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink600
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink700
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink900
+import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
+import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurface
+import com.ryuuflores2006.inventorysystem.ui.theme.DeepSpace
 import kotlinx.coroutines.launch
 
 /**
@@ -35,7 +35,7 @@ fun UpdateDialog() {
             val release = state.release
             AlertDialog(
                 onDismissRequest = { if (!release.is_mandatory) UpdateManager.dismiss() },
-                containerColor = Ink700,
+                containerColor = GlassSurface,
                 icon = { Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = Cyan) },
                 title = { Text("Update to ${release.version_name}") },
                 text = {
@@ -64,7 +64,7 @@ fun UpdateDialog() {
                 },
                 confirmButton = {
                     Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Ink900),
+                        colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = DeepSpace),
                         onClick = { scope.launch { UpdateManager.download(context, release) } }
                     ) { Text("Download") }
                 },
@@ -79,7 +79,7 @@ fun UpdateDialog() {
         is UpdateManager.State.Downloading -> {
             AlertDialog(
                 onDismissRequest = { },
-                containerColor = Ink700,
+                containerColor = GlassSurface,
                 title = { Text("Downloading ${state.release.version_name}") },
                 text = {
                     Column {
@@ -88,7 +88,7 @@ fun UpdateDialog() {
                                 progress = { state.progress },
                                 modifier = Modifier.fillMaxWidth(),
                                 color = Cyan,
-                                trackColor = Ink600
+                                trackColor = GlassSurfaceRaised
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
@@ -100,7 +100,7 @@ fun UpdateDialog() {
                             LinearProgressIndicator(
                                 modifier = Modifier.fillMaxWidth(),
                                 color = Cyan,
-                                trackColor = Ink600
+                                trackColor = GlassSurfaceRaised
                             )
                         }
                     }
@@ -113,7 +113,7 @@ fun UpdateDialog() {
             val allowed = UpdateManager.canInstall(context)
             AlertDialog(
                 onDismissRequest = { },
-                containerColor = Ink700,
+                containerColor = GlassSurface,
                 icon = { Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = Cyan) },
                 title = { Text("Ready to install") },
                 text = {
@@ -131,7 +131,7 @@ fun UpdateDialog() {
                 },
                 confirmButton = {
                     Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Ink900),
+                        colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = DeepSpace),
                         onClick = {
                             if (allowed) {
                                 UpdateManager.install(context, state.file)
@@ -150,7 +150,7 @@ fun UpdateDialog() {
         is UpdateManager.State.Failed -> {
             AlertDialog(
                 onDismissRequest = { UpdateManager.clearError() },
-                containerColor = Ink700,
+                containerColor = GlassSurface,
                 title = { Text("Update") },
                 text = { Text(state.message, color = Ash) },
                 confirmButton = {

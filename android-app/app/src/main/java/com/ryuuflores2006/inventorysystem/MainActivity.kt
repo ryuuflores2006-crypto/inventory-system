@@ -41,8 +41,8 @@ import com.ryuuflores2006.inventorysystem.ui.screens.StockInScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.UpdateDialog
 import com.ryuuflores2006.inventorysystem.ui.theme.Ash
 import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink600
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink800
+import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
+import com.ryuuflores2006.inventorysystem.ui.theme.GlassBase
 import com.ryuuflores2006.inventorysystem.ui.theme.InventorySystemTheme
 import kotlinx.coroutines.launch
 
@@ -165,7 +165,7 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
             TopAppBar(
                 title = { Text("J-LOU Inventory", style = MaterialTheme.typography.titleLarge) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Ink800,
+                    containerColor = GlassBase,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 actions = {
@@ -177,7 +177,7 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
                         DropdownMenu(
                             expanded = menuOpen,
                             onDismissRequest = { menuOpen = false },
-                            modifier = Modifier.background(Ink600)
+                            modifier = Modifier.background(GlassSurfaceRaised)
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Check for updates") },
@@ -205,7 +205,7 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
             )
         },
         bottomBar = {
-            NavigationBar(containerColor = Ink800) {
+            NavigationBar(containerColor = GlassBase) {
                 TABS.forEachIndexed { index, tab ->
                     NavigationBarItem(
                         selected = currentTab == index,

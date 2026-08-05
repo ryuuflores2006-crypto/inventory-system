@@ -24,7 +24,7 @@ import com.ryuuflores2006.inventorysystem.ui.components.*
 import com.ryuuflores2006.inventorysystem.ui.theme.Amber
 import com.ryuuflores2006.inventorysystem.ui.theme.Ash
 import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink600
+import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
 import com.ryuuflores2006.inventorysystem.ui.theme.Emerald
 import kotlinx.coroutines.launch
 

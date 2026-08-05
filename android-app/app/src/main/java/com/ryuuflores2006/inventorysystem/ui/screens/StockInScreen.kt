@@ -21,7 +21,7 @@ import com.ryuuflores2006.inventorysystem.data.TacLookup
 import com.ryuuflores2006.inventorysystem.ui.components.*
 import com.ryuuflores2006.inventorysystem.ui.theme.Ash
 import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink600
+import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
 import kotlinx.coroutines.launch
 
 /**
@@ -228,7 +228,7 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                             }
                         },
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = Ink600,
+                            containerColor = GlassSurfaceRaised,
                             contentColor = Cyan
                         ),
                         modifier = Modifier
@@ -382,7 +382,7 @@ private fun segmentColors() = SegmentedButtonDefaults.colors(
     activeContainerColor = Cyan.copy(alpha = 0.16f),
     activeContentColor = Cyan,
     activeBorderColor = Cyan.copy(alpha = 0.5f),
-    inactiveContainerColor = Ink600,
+    inactiveContainerColor = GlassSurfaceRaised,
     inactiveContentColor = Ash,
-    inactiveBorderColor = com.ryuuflores2006.inventorysystem.ui.theme.Ink500
+    inactiveBorderColor = com.ryuuflores2006.inventorysystem.ui.theme.GlassBorder
 )

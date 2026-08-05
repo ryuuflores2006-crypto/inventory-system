@@ -50,7 +50,7 @@ fun RepairTicketScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 ExtendedFloatingActionButton(
                     onClick = { showIntake = true },
                     containerColor = Cyan,
-                    contentColor = Ink900,
+                    contentColor = DeepSpace,
                     icon = { Icon(Icons.Default.Build, contentDescription = null) },
                     text = { Text("New repair") }
                 )
@@ -173,7 +173,7 @@ private fun TicketCard(ticket: ServiceTicket, onStatusChange: (String) -> Unit) 
                 DropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
-                    modifier = Modifier.background(Ink600)
+                    modifier = Modifier.background(GlassSurfaceRaised)
                 ) {
                     TICKET_STATUSES.forEach { status ->
                         DropdownMenuItem(
@@ -220,7 +220,7 @@ private fun TicketCard(ticket: ServiceTicket, onStatusChange: (String) -> Unit) 
         }
 
         if (expanded) {
-            HorizontalDivider(color = Ink500, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = GlassBorder, modifier = Modifier.padding(vertical = 12.dp))
             DetailRow("IMEI", ticket.imei_serial)
             DetailRow("Technician", ticket.assigned_technician ?: "Unassigned")
             DetailRow("Labour", peso(ticket.labor_cost))
@@ -230,7 +230,7 @@ private fun TicketCard(ticket: ServiceTicket, onStatusChange: (String) -> Unit) 
                 onClick = { menuOpen = true },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Ink500)
+                border = androidx.compose.foundation.BorderStroke(1.dp, GlassBorder)
             ) {
                 Text("Change status")
             }
@@ -322,7 +322,7 @@ private fun RepairIntakeForm(
                     }
                 },
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Ink600,
+                    containerColor = GlassSurfaceRaised,
                     contentColor = Cyan
                 ),
                 modifier = Modifier

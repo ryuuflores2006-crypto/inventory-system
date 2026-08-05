@@ -93,7 +93,7 @@ fun InventoryListScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
             FilledTonalIconButton(
                 onClick = { onScanClick { scanned -> searchQuery = scanned } },
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Ink600,
+                    containerColor = GlassSurfaceRaised,
                     contentColor = Cyan
                 ),
                 modifier = Modifier.size(56.dp)
@@ -112,7 +112,7 @@ fun InventoryListScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
             selectedTabIndex = if (showParts) 1 else 0,
             containerColor = MaterialTheme.colorScheme.background,
             contentColor = Cyan,
-            divider = { HorizontalDivider(color = Ink600) }
+            divider = { HorizontalDivider(color = GlassSurfaceRaised) }
         ) {
             Tab(
                 selected = !showParts,
@@ -204,7 +204,7 @@ fun GadgetItemCard(gadget: RetailGadget) {
         }
 
         if (expanded) {
-            HorizontalDivider(color = Ink500, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = GlassBorder, modifier = Modifier.padding(vertical = 12.dp))
             DetailRow("SKU", gadget.sku)
             DetailRow("IMEI 1", gadget.imei_1)
             gadget.imei_2?.takeIf { it.isNotBlank() }?.let { DetailRow("IMEI 2", it) }
@@ -274,7 +274,7 @@ fun PartItemCard(part: RepairPart) {
         }
 
         if (expanded) {
-            HorizontalDivider(color = Ink500, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = GlassBorder, modifier = Modifier.padding(vertical = 12.dp))
             DetailRow("Fits", part.compatible_models.joinToString(", ").ifBlank { "Not specified" })
             DetailRow("Cost", peso(part.cost_price))
             DetailRow("Margin", peso(part.service_price - part.cost_price), Emerald)
@@ -307,7 +307,7 @@ private fun RemoveRow(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    HorizontalDivider(color = Ink500, modifier = Modifier.padding(vertical = 8.dp))
+    HorizontalDivider(color = GlassBorder, modifier = Modifier.padding(vertical = 8.dp))
 
     if (blocked != null) {
         Text(blocked, style = MaterialTheme.typography.bodySmall, color = Ash)

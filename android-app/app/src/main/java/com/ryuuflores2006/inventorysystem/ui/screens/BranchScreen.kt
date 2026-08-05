@@ -41,7 +41,7 @@ fun BranchScreen() {
             ExtendedFloatingActionButton(
                 onClick = { showAddDialog = true },
                 containerColor = Cyan,
-                contentColor = Ink900,
+                contentColor = DeepSpace,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("Add branch") }
             )
@@ -108,7 +108,7 @@ fun BranchScreen() {
     pendingArchive?.let { branch ->
         AlertDialog(
             onDismissRequest = { pendingArchive = null },
-            containerColor = Ink700,
+            containerColor = GlassSurface,
             title = { Text("Archive ${branch.name}?") },
             text = {
                 Text(
@@ -212,7 +212,7 @@ private fun AddBranchDialog(onDismiss: () -> Unit, onAdded: (String) -> Unit) {
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        containerColor = Ink700,
+        containerColor = GlassSurface,
         title = { Text("Add branch") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -226,7 +226,7 @@ private fun AddBranchDialog(onDismiss: () -> Unit, onAdded: (String) -> Unit) {
         confirmButton = {
             Button(
                 enabled = !busy && name.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Ink900),
+                colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = DeepSpace),
                 onClick = {
                     busy = true
                     error = null

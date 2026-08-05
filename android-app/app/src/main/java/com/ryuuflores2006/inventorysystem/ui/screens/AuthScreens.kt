@@ -28,8 +28,8 @@ import com.ryuuflores2006.inventorysystem.ui.components.ErrorBanner
 import com.ryuuflores2006.inventorysystem.ui.components.PrimaryButton
 import com.ryuuflores2006.inventorysystem.ui.theme.Ash
 import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink500
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink600
+import com.ryuuflores2006.inventorysystem.ui.theme.GlassBorder
+import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
 import io.github.jan.supabase.gotrue.providers.builtin.Email
 import kotlinx.coroutines.launch
 
@@ -172,10 +172,10 @@ private fun AuthShell(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Ink600,
-                unfocusedContainerColor = Ink600,
+                focusedContainerColor = GlassSurfaceRaised,
+                unfocusedContainerColor = GlassSurfaceRaised,
                 focusedBorderColor = Cyan,
-                unfocusedBorderColor = Ink500,
+                unfocusedBorderColor = GlassBorder,
                 focusedLabelColor = Cyan,
                 unfocusedLabelColor = Ash,
                 cursorColor = Cyan

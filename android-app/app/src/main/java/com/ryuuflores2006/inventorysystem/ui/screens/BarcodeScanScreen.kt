@@ -328,7 +328,7 @@ private fun ScanResultCard(
             .fillMaxWidth()
             .padding(16.dp),
         shape = RoundedCornerShape(20.dp),
-        color = Ink700,
+        color = GlassSurface,
         tonalElevation = 6.dp
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
@@ -505,7 +505,7 @@ private fun ScanResultCard(
                 Button(
                     onClick = onUse,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Ink900)
+                    colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = DeepSpace)
                 ) { Text("Use this") }
             }
         }
@@ -559,7 +559,7 @@ private fun CameraPermissionNotice(
         Spacer(Modifier.height(20.dp))
         Button(
             onClick = if (asked) onSettings else onGrant,
-            colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Ink900)
+            colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = DeepSpace)
         ) { Text(if (asked) "Open app settings" else "Allow camera") }
         TextButton(onClick = onClose) { Text("Cancel", color = Ash) }
     }

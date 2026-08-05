@@ -40,9 +40,9 @@ import androidx.compose.ui.unit.dp
 import com.ryuuflores2006.inventorysystem.ui.theme.Ash
 import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
 import com.ryuuflores2006.inventorysystem.ui.theme.Emerald
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink500
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink600
-import com.ryuuflores2006.inventorysystem.ui.theme.Ink700
+import com.ryuuflores2006.inventorysystem.ui.theme.GlassBorder
+import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
+import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurface
 
 /**
  * The shared building blocks. Every screen is assembled from these so spacing,
@@ -62,9 +62,17 @@ fun AppCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Ink700)
-            .border(BorderStroke(1.dp, Ink500), shape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        GlassSurface,
+                        GlassSurface.copy(alpha = 0.4f)
+                    )
+                )
+            )
+            .border(BorderStroke(1.dp, GlassBorder), shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .animateContentSize()
             .padding(contentPadding),
         content = content
     )
@@ -203,12 +211,12 @@ fun AppTextField(
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Ink600,
-            unfocusedContainerColor = Ink600,
-            disabledContainerColor = Ink600,
-            errorContainerColor = Ink600,
+            focusedContainerColor = GlassSurfaceRaised,
+            unfocusedContainerColor = GlassSurfaceRaised,
+            disabledContainerColor = GlassSurfaceRaised,
+            errorContainerColor = GlassSurfaceRaised,
             focusedBorderColor = Cyan,
-            unfocusedBorderColor = Ink500,
+            unfocusedBorderColor = GlassBorder,
             focusedLabelColor = Cyan,
             unfocusedLabelColor = Ash,
             cursorColor = Cyan
@@ -238,10 +246,10 @@ fun SearchField(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Ink600,
-            unfocusedContainerColor = Ink600,
+            focusedContainerColor = GlassSurfaceRaised,
+            unfocusedContainerColor = GlassSurfaceRaised,
             focusedBorderColor = Cyan,
-            unfocusedBorderColor = Ink500,
+            unfocusedBorderColor = GlassBorder,
             cursorColor = Cyan
         )
     )
@@ -277,11 +285,11 @@ fun AppDropdown(
                 .menuAnchor(),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Ink600,
-                unfocusedContainerColor = Ink600,
-                disabledContainerColor = Ink600,
+                focusedContainerColor = GlassSurfaceRaised,
+                unfocusedContainerColor = GlassSurfaceRaised,
+                disabledContainerColor = GlassSurfaceRaised,
                 focusedBorderColor = Cyan,
-                unfocusedBorderColor = Ink500,
+                unfocusedBorderColor = GlassBorder,
                 focusedLabelColor = Cyan,
                 unfocusedLabelColor = Ash,
                 disabledTextColor = Ash
@@ -290,7 +298,7 @@ fun AppDropdown(
         ExposedDropdownMenu(
             expanded = expanded && enabled && options.isNotEmpty(),
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(Ink600)
+            modifier = Modifier.background(GlassSurfaceRaised)
         ) {
             options.forEach { option ->
                 DropdownMenuItem(
@@ -330,7 +338,7 @@ fun FilterChipRow(
                 label = { Text(option, style = MaterialTheme.typography.labelLarge) },
                 shape = CircleShape,
                 colors = FilterChipDefaults.filterChipColors(
-                    containerColor = Ink600,
+                    containerColor = GlassSurfaceRaised,
                     labelColor = Ash,
                     selectedContainerColor = Cyan.copy(alpha = 0.16f),
                     selectedLabelColor = Cyan
@@ -338,7 +346,7 @@ fun FilterChipRow(
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
                     selected = isSelected,
-                    borderColor = Ink500,
+                    borderColor = GlassBorder,
                     selectedBorderColor = Cyan.copy(alpha = 0.5f)
                 )
             )
@@ -365,8 +373,8 @@ fun PrimaryButton(
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = Cyan,
-            contentColor = com.ryuuflores2006.inventorysystem.ui.theme.Ink900,
-            disabledContainerColor = Ink600,
+            contentColor = com.ryuuflores2006.inventorysystem.ui.theme.DeepSpace,
+            disabledContainerColor = GlassSurfaceRaised,
             disabledContentColor = Ash
         )
     ) {
@@ -374,7 +382,7 @@ fun PrimaryButton(
             CircularProgressIndicator(
                 modifier = Modifier.size(18.dp),
                 strokeWidth = 2.dp,
-                color = com.ryuuflores2006.inventorysystem.ui.theme.Ink900
+                color = com.ryuuflores2006.inventorysystem.ui.theme.DeepSpace
             )
             Spacer(Modifier.width(10.dp))
         } else if (icon != null) {
@@ -430,7 +438,7 @@ fun EmptyState(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Cyan,
-                    contentColor = com.ryuuflores2006.inventorysystem.ui.theme.Ink900
+                    contentColor = com.ryuuflores2006.inventorysystem.ui.theme.DeepSpace
                 )
             ) { Text(actionLabel) }
         }
@@ -454,7 +462,7 @@ fun LoadingCards(count: Int = 4, modifier: Modifier = Modifier) {
                     .fillMaxWidth()
                     .height(84.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Ink600.copy(alpha = alpha))
+                    .background(GlassSurfaceRaised.copy(alpha = alpha))
             )
         }
     }
@@ -507,9 +515,17 @@ fun StatCard(
     Column(
         modifier = modifier
             .clip(shape)
-            .background(Ink700)
-            .border(BorderStroke(1.dp, Ink500), shape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        GlassSurface,
+                        GlassSurface.copy(alpha = 0.4f)
+                    )
+                )
+            )
+            .border(BorderStroke(1.dp, GlassBorder), shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .animateContentSize()
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
