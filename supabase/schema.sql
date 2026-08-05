@@ -664,7 +664,7 @@ REVOKE INSERT, UPDATE, DELETE ON sales FROM authenticated;
 GRANT SELECT ON sales TO authenticated;
 GRANT USAGE ON SEQUENCE sales_invoice_seq TO authenticated;
 
-GRANT EXECUTE ON FUNCTION record_sale(TEXT, TEXT, TEXT, INT, NUMERIC, TEXT, TEXT, TEXT, TEXT, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION record_sale(TEXT, TEXT, TEXT, INT, NUMERIC, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION void_sale(UUID, TEXT, TEXT) TO authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -679,3 +679,4 @@ BEGIN
     END;
     ALTER TABLE public.sales REPLICA IDENTITY FULL;
 END $$;
+

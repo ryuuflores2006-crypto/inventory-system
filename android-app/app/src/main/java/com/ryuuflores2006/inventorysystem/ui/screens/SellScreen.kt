@@ -66,13 +66,13 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
 
     val gadget: RetailGadget? = remember(selected, LiveStore.gadgets) {
         selected.takeIf { it.isNotBlank() }?.let { ref ->
-            LiveStore.gadgets.firstOrNull { it.imei_1 == ref && it.status == "In Stock" }
+            LiveStore.gadgets.firstOrNull { it.imei_1 == ref && it.status == "In Stock" && it.current_branch == myBranch }
         }
     }
     val part: RepairPart? = remember(selected, LiveStore.parts, gadget) {
         if (gadget != null) null
         else selected.takeIf { it.isNotBlank() }?.let { ref ->
-            LiveStore.parts.firstOrNull { it.sku.equals(ref, true) && it.stock_qty > 0 }
+            LiveStore.parts.firstOrNull { it.sku.equals(ref, true) && it.stock_qty > 0 && it.branch_location == myBranch }
         }
     }
     val chosen = gadget != null || part != null
