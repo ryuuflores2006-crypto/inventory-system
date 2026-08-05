@@ -334,6 +334,96 @@ object SupabaseHelper {
             }
         }
 
+    // --- Sales ---
+    /** Newest first, so the counter sees what it just rang up at the top. */
+    suspend fun getSales(): List<Sale> = withContext(Dispatchers.IO) {
+        try {
+            postgrest["sales"].select {
+                order("sold_at", Order.DESCENDING)
+                limit(300)
+            }.decodeList()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    /**
+     * Ring up a sale.
+     *
+     * Everything happens inside `record_sale`, which marks the unit sold (or
+     * takes the quantity off the shelf) and writes the receipt in one
+     * transaction. Two cashiers selling the same handset at once is settled
+     * there too — the second one is refused rather than overwriting the first.
+     */
+    suspend fun recordSale(
+        itemType: String,
+        reference: String,
+        cashier: String,
+        quantity: Int = 1,
+        unitPrice: Double? = null,
+        paymentMethod: String = "Cash",
+        customerName: String? = null,
+        customerPhone: String? = null,
+        branch: String? = null,
+        notes: String? = null
+    ): SaleOutcome = withContext(Dispatchers.IO) {
+        try {
+            val sale = supabase.postgrest.rpc(
+                "record_sale",
+                buildJsonObject {
+                    put("p_item_type", itemType)
+                    put("p_reference", reference)
+                    put("p_cashier", cashier)
+                    put("p_quantity", quantity)
+                    if (unitPrice != null) put("p_unit_price", unitPrice)
+                    put("p_payment_method", paymentMethod)
+                    customerName?.takeIf { it.isNotBlank() }?.let { put("p_customer_name", it) }
+                    customerPhone?.takeIf { it.isNotBlank() }?.let { put("p_customer_phone", it) }
+                    branch?.let { put("p_branch", it) }
+                    notes?.takeIf { it.isNotBlank() }?.let { put("p_notes", it) }
+                }
+            ).decodeAs<Sale>()
+            SaleOutcome.Ok(sale)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            SaleOutcome.Failed(readableDbError(e, "Could not record the sale."))
+        }
+    }
+
+    /** Undo a sale: the receipt stays, marked Voided, and the stock comes back. */
+    suspend fun voidSale(saleId: String, by: String, reason: String?): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                supabase.postgrest.rpc(
+                    "void_sale",
+                    buildJsonObject {
+                        put("p_sale_id", saleId)
+                        put("p_by", by)
+                        reason?.takeIf { it.isNotBlank() }?.let { put("p_reason", it) }
+                    }
+                )
+                null
+            } catch (e: Exception) {
+                e.printStackTrace()
+                readableDbError(e, "Could not void that sale.")
+            }
+        }
+
+    /**
+     * Postgres speaks to us in a JSON envelope. The part worth showing a
+     * cashier is the `message` our own RAISE EXCEPTION put there; everything
+     * around it is noise that makes a clear refusal look like a crash.
+     */
+    private fun readableDbError(e: Exception, fallback: String): String {
+        val raw = e.message ?: return fallback
+        val message = Regex("\"message\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+            .find(raw)?.groupValues?.get(1)
+            ?.replace("\\\"", "\"")
+            ?.replace("\\n", " ")
+        return message?.takeIf { it.isNotBlank() } ?: raw.takeIf { it.length < 160 } ?: fallback
+    }
+
     // --- App releases (in-app updater) ---
     /** Newest published release, or null if none / offline. */
     suspend fun getLatestRelease(): AppRelease? = withContext(Dispatchers.IO) {

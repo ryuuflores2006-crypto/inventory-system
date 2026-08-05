@@ -31,6 +31,8 @@ object LiveStore {
         private set
     var transfers by mutableStateOf<List<BranchTransfer>>(emptyList())
         private set
+    var sales by mutableStateOf<List<Sale>>(emptyList())
+        private set
 
     /** True during the very first load, so screens can show skeletons not "empty". */
     var isLoading by mutableStateOf(false)
@@ -52,6 +54,10 @@ object LiveStore {
 
     val openTickets: List<ServiceTicket>
         get() = tickets.filter { it.ticket_status !in setOf("Completed", "Cancelled") }
+
+    /** Voided receipts are kept, but they are not takings. */
+    val completedSales: List<Sale>
+        get() = sales.filter { !it.isVoided }
 
     val lowStockParts: List<RepairPart>
         get() = parts.filter { it.stock_qty <= it.minimum_stock_threshold }
@@ -76,12 +82,14 @@ object LiveStore {
                 val p = async { SupabaseHelper.getAllParts() }
                 val t = async { SupabaseHelper.getAllTickets() }
                 val x = async { SupabaseHelper.getAllTransfers() }
+                val s = async { SupabaseHelper.getSales() }
                 val b = async { BranchStore.refresh() }
-                awaitAll(g, p, t, x, b)
+                awaitAll(g, p, t, x, s, b)
                 gadgets = g.await()
                 parts = p.await()
                 tickets = t.await()
                 transfers = x.await()
+                sales = s.await()
             }
             hasLoadedOnce = true
         } finally {
@@ -149,6 +157,7 @@ object LiveStore {
         parts = emptyList()
         tickets = emptyList()
         transfers = emptyList()
+        sales = emptyList()
         hasLoadedOnce = false
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
@@ -35,6 +36,7 @@ import com.ryuuflores2006.inventorysystem.ui.screens.InventoryListScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.LoginScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.RegisterScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.RepairTicketScreen
+import com.ryuuflores2006.inventorysystem.ui.screens.SellScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.StockInScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.UpdateDialog
 import com.ryuuflores2006.inventorysystem.ui.theme.Ash
@@ -112,6 +114,7 @@ private val TABS = listOf(
     Tab("Home", Icons.Default.Dashboard),
     Tab("Stock", Icons.Default.Inventory2),
     Tab("Stock-In", Icons.Default.AddCircle),
+    Tab("Sell", Icons.Default.PointOfSale),
     Tab("Repairs", Icons.Default.Build),
     Tab("Transfer", Icons.Default.LocalShipping),
     Tab("Branches", Icons.Default.Storefront)
@@ -225,13 +228,14 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
             when (currentTab) {
                 0 -> HomeScreen(
                     onOpenInventory = { currentTab = 1 },
-                    onOpenRepairs = { currentTab = 3 }
+                    onOpenRepairs = { currentTab = 4 }
                 )
                 1 -> InventoryListScreen(onScanClick = openScanner)
                 2 -> StockInScreen(onScanClick = openScanner)
-                3 -> RepairTicketScreen(onScanClick = openScanner)
-                4 -> TransferScreen(onScanClick = openScanner)
-                5 -> BranchScreen()
+                3 -> SellScreen(onScanClick = openScanner)
+                4 -> RepairTicketScreen(onScanClick = openScanner)
+                5 -> TransferScreen(onScanClick = openScanner)
+                6 -> BranchScreen()
             }
         }
     }

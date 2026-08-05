@@ -123,3 +123,46 @@ data class BranchTransfer(
     val created_at: String? = null,
     val updated_at: String? = null
 )
+
+/**
+ * A sale that actually happened.
+ *
+ * Written only by the `record_sale` database function — never inserted from a
+ * client — so the stock move and the money are one transaction. Voiding keeps
+ * the row and puts the stock back rather than deleting the receipt.
+ */
+@Serializable
+data class Sale(
+    val sale_id: String? = null,
+    val invoice_no: String = "",
+    val branch_location: String = "",
+    val item_type: String = "Serialized", // 'Serialized' or 'Bulk'
+    val reference_identifier: String = "", // IMEI or SKU
+    val description: String = "",
+    val item_id: String? = null,
+    val part_id: String? = null,
+    val quantity: Int = 1,
+    val unit_price: Double = 0.0,
+    val total_amount: Double = 0.0,
+    val cost_total: Double = 0.0,
+    val payment_method: String = "Cash",
+    val customer_name: String? = null,
+    val customer_phone: String? = null,
+    val cashier: String = "",
+    val notes: String? = null,
+    val status: String = "Completed", // 'Completed' or 'Voided'
+    val void_reason: String? = null,
+    val voided_by: String? = null,
+    val voided_at: String? = null,
+    val sold_at: String? = null
+) {
+    val isVoided: Boolean get() = status == "Voided"
+    /** What the shop actually made on it, once the unit's own cost is off. */
+    val profit: Double get() = total_amount - cost_total
+}
+
+/** Either a finished receipt, or a reason a cashier can act on. */
+sealed interface SaleOutcome {
+    data class Ok(val sale: Sale) : SaleOutcome
+    data class Failed(val message: String) : SaleOutcome
+}

@@ -31,13 +31,16 @@ import Modal from '@/components/Modal';
 import {
   ALL_BRANCHES,
   GADGET_STATUSES,
+  PAYMENT_METHODS,
   TICKET_STATUSES,
   peso,
   type Branch,
   type BranchTransfer,
   type ItemType,
   type RepairPart,
+  type PaymentMethod,
   type RetailGadget,
+  type Sale,
   type ServiceTicket,
   type TicketPartsUsed,
   type TicketStatus,
@@ -62,6 +65,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
   const [tickets, setTickets] = useState<ServiceTicket[]>([]);
   const [transfers, setTransfers] = useState<BranchTransfer[]>([]);
   const [ticketPartsUsed, setTicketPartsUsed] = useState<TicketPartsUsed[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -81,16 +85,17 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
   const loadAll = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
-    const [bRes, gRes, pRes, tRes, trRes, tpRes] = await Promise.all([
+    const [bRes, gRes, pRes, tRes, trRes, tpRes, sRes] = await Promise.all([
       supabase.from('branches').select('*').order('is_main', { ascending: false }).order('name'),
       supabase.from('retail_gadgets').select('*').order('created_at', { ascending: false }),
       supabase.from('repair_parts').select('*').order('part_name'),
       supabase.from('service_tickets').select('*').order('created_at', { ascending: false }),
       supabase.from('branch_transfers').select('*').order('created_at', { ascending: false }),
       supabase.from('ticket_parts_used').select('*'),
+      supabase.from('sales').select('*').order('sold_at', { ascending: false }).limit(500),
     ]);
 
-    const firstError = [bRes, gRes, pRes, tRes, trRes, tpRes].find((r) => r.error)?.error;
+    const firstError = [bRes, gRes, pRes, tRes, trRes, tpRes, sRes].find((r) => r.error)?.error;
     if (firstError) {
       setLoadError(firstError.message);
     } else {
@@ -100,6 +105,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
       setTickets((tRes.data ?? []) as ServiceTicket[]);
       setTransfers((trRes.data ?? []) as BranchTransfer[]);
       setTicketPartsUsed((tpRes.data ?? []) as TicketPartsUsed[]);
+      setSales((sRes.data ?? []) as Sale[]);
       setLastSynced(new Date());
     }
     setIsLoading(false);
@@ -713,7 +719,14 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
 
         {/* ------------------------------------------------------------------ */}
         {activeTab === 'sales' && (
-          <SalesTab gadgets={gadgets} parts={parts} notify={notify} reload={loadAll} />
+          <SalesTab
+            gadgets={gadgets}
+            parts={parts}
+            sales={sales}
+            cashierName={session.user.email ?? ''}
+            notify={notify}
+            reload={loadAll}
+          />
         )}
 
         {/* ------------------------------------------------------------------ */}
@@ -2061,11 +2074,15 @@ function TransferModal({
 function SalesTab({
   gadgets,
   parts,
+  sales,
+  cashierName,
   notify,
   reload,
 }: {
   gadgets: RetailGadget[];
   parts: RepairPart[];
+  sales: Sale[];
+  cashierName: string;
   notify: Notify;
   reload: () => Promise<void>;
 }) {
@@ -2073,242 +2090,396 @@ function SalesTab({
   const [imei, setImei] = useState('');
   const [partId, setPartId] = useState('');
   const [qty, setQty] = useState('1');
+  const [price, setPrice] = useState('');
+  const [payment, setPayment] = useState<PaymentMethod>('Cash');
+  const [customer, setCustomer] = useState('');
+  const [cashier, setCashier] = useState(cashierName);
   const [busy, setBusy] = useState(false);
-  const [invoice, setInvoice] = useState<{
-    type: string;
-    branch: string;
-    item: string;
-    identifier: string;
-    total: number;
-    time: string;
-    no: string;
-  } | null>(null);
+  const [invoice, setInvoice] = useState<Sale | null>(null);
 
-  // Asking which register you are on, then showing only that store's stock,
-  // meant a cashier holding a phone from another branch got an empty list and
-  // no explanation. Sell what is actually sellable anywhere, and read the
-  // branch off the unit — it is the unit that knows where it lives.
-  const branchDevices = gadgets.filter((g) => g.status === 'In Stock');
-  const branchParts = parts.filter((p) => p.stock_qty > 0);
-  const sellingDevice = branchDevices.find((g) => g.imei_1 === imei);
-  const sellingPart = branchParts.find((p) => p.part_id === partId);
+  const sellableDevices = gadgets.filter((g) => g.status === 'In Stock');
+  const sellableParts = parts.filter((p) => p.stock_qty > 0);
+  const sellingDevice = sellableDevices.find((g) => g.imei_1 === imei);
+  const sellingPart = sellableParts.find((p) => p.part_id === partId);
+
+  // The list price is where the conversation starts, not where it ends. Prefill
+  // it so the ordinary sale is one click, and let a discount be typed over it.
+  const listPrice = mode === 'device' ? sellingDevice?.retail_price : sellingPart?.service_price;
+  useEffect(() => {
+    setPrice(listPrice == null ? '' : String(Number(listPrice)));
+  }, [listPrice]);
+
+  const unitPrice = Number(price);
+  const lineQty = mode === 'accessory' ? Math.max(Number(qty) || 0, 0) : 1;
+  const lineTotal = (Number.isFinite(unitPrice) ? unitPrice : 0) * lineQty;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!cashier.trim()) {
+      notify('err', 'Who is making this sale?');
+      return;
+    }
+    if (mode === 'device' ? !sellingDevice : !sellingPart) {
+      notify('err', mode === 'device' ? 'Choose a phone first.' : 'Choose an item first.');
+      return;
+    }
+
     setBusy(true);
     try {
-      if (mode === 'device') {
-        const g = branchDevices.find((x) => x.imei_1 === imei);
-        if (!g) {
-          notify('err', `No In Stock device with IMEI ${imei}.`);
-          return;
-        }
-        const { error } = await supabase.from('retail_gadgets').update({ status: 'Sold' }).eq('item_id', g.item_id);
-        if (error) {
-          notify('err', error.message);
-          return;
-        }
-        setInvoice({
-          type: 'Serialized device sale',
-          branch: g.current_branch,
-          item: `${g.brand} ${g.model} (${g.color}, ${g.storage})`,
-          identifier: `IMEI: ${g.imei_1}`,
-          total: Number(g.retail_price),
-          time: new Date().toLocaleString(),
-          no: `INV-${g.item_id.substring(0, 6).toUpperCase()}`,
-        });
-        setImei('');
-      } else {
-        const p = branchParts.find((x) => x.part_id === partId);
-        const n = Number(qty);
-        if (!p) {
-          notify('err', 'Choose an accessory first.');
-          return;
-        }
-        if (p.stock_qty < n) {
-          notify('err', `Only ${p.stock_qty} left at ${p.branch_location}.`);
-          return;
-        }
-        const { error } = await supabase
-          .from('repair_parts')
-          .update({ stock_qty: p.stock_qty - n })
-          .eq('part_id', p.part_id);
-        if (error) {
-          notify('err', error.message);
-          return;
-        }
-        setInvoice({
-          type: 'Accessory / parts sale',
-          branch: p.branch_location,
-          item: p.part_name,
-          identifier: `SKU: ${p.sku} × ${n}`,
-          total: Number(p.service_price) * n,
-          time: new Date().toLocaleString(),
-          no: `INV-${p.part_id.substring(0, 6).toUpperCase()}`,
-        });
-        setPartId('');
-        setQty('1');
+      // One call, one transaction. This used to flip the stock row here and
+      // build a receipt in the browser that was never stored — so a sale left
+      // no date, no price actually charged, and no way back from a mis-click.
+      const { data, error } = await supabase.rpc('record_sale', {
+        p_item_type: mode === 'device' ? 'Serialized' : 'Bulk',
+        p_reference: mode === 'device' ? sellingDevice!.imei_1 : sellingPart!.sku,
+        p_cashier: cashier.trim(),
+        p_quantity: lineQty,
+        p_unit_price: Number.isFinite(unitPrice) ? unitPrice : null,
+        p_payment_method: payment,
+        p_customer_name: customer.trim() || null,
+        p_branch: mode === 'accessory' ? sellingPart!.branch_location : null,
+      });
+
+      if (error) {
+        notify('err', error.message);
+        return;
       }
-      notify('ok', 'Sale recorded and stock deducted.');
+
+      const sale = data as Sale;
+      setInvoice(sale);
+      setImei('');
+      setPartId('');
+      setQty('1');
+      setCustomer('');
+      notify('ok', `Sale recorded — ${sale.invoice_no}.`);
       await reload();
     } finally {
       setBusy(false);
     }
   };
 
+  const voidSale = async (sale: Sale) => {
+    const reason = window.prompt(
+      `Void ${sale.invoice_no} — ${sale.description}?\n\nThe receipt is kept and marked voided, and the stock goes back.\n\nReason:`,
+      ''
+    );
+    if (reason === null) return;
+
+    setBusy(true);
+    try {
+      const { error } = await supabase.rpc('void_sale', {
+        p_sale_id: sale.sale_id,
+        p_by: cashier.trim() || cashierName,
+        p_reason: reason.trim() || null,
+      });
+      if (error) {
+        notify('err', error.message);
+        return;
+      }
+      notify('ok', `${sale.invoice_no} voided — the stock is back.`);
+      if (invoice?.sale_id === sale.sale_id) setInvoice(null);
+      await reload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const completed = sales.filter((s) => s.status === 'Completed');
+  const today = new Date().toDateString();
+  const grossToday = completed
+    .filter((s) => new Date(s.sold_at).toDateString() === today)
+    .reduce((sum, s) => sum + Number(s.total_amount), 0);
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 30 }}>
-      <div className="glass-panel" style={{ padding: 24 }}>
-        <h2>Issue customer invoice</h2>
-        <p style={{ marginBottom: 20 }}>
-          Pick what the customer is buying. Stock is deducted from the store that holds it.
-        </p>
+    <div style={{ display: 'grid', gap: 30 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 30 }}>
+        <div className="glass-panel" style={{ padding: 24 }}>
+          <h2>Issue customer invoice</h2>
+          <p style={{ marginBottom: 20 }}>
+            Pick what the customer is buying. Stock comes off the store that holds it.
+          </p>
 
-        <form onSubmit={submit}>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-            <button
-              type="button"
-              className={`btn ${mode === 'device' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ flex: 1 }}
-              onClick={() => setMode('device')}
-            >
-              Phone / tablet
-            </button>
-            <button
-              type="button"
-              className={`btn ${mode === 'accessory' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ flex: 1 }}
-              onClick={() => setMode('accessory')}
-            >
-              Accessory / part
-            </button>
-          </div>
+          <form onSubmit={submit}>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+              <button
+                type="button"
+                className={`btn ${mode === 'device' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ flex: 1 }}
+                onClick={() => setMode('device')}
+              >
+                Phone / tablet
+              </button>
+              <button
+                type="button"
+                className={`btn ${mode === 'accessory' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ flex: 1 }}
+                onClick={() => setMode('accessory')}
+              >
+                Accessory / part
+              </button>
+            </div>
 
-          {mode === 'device' ? (
-            <Field label="Which phone *">
-              <select className="form-input" value={imei} onChange={(e) => setImei(e.target.value)} required>
-                <option value="">Choose a phone…</option>
-                {branchDevices.map((g) => (
-                  <option key={g.item_id} value={g.imei_1}>
-                    {g.brand} {g.model} · {g.color} · {peso(g.retail_price)} · {g.current_branch} · {g.imei_1}
-                  </option>
-                ))}
-              </select>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                {branchDevices.length === 0
-                  ? 'No phones in stock at any store yet.'
-                  : sellingDevice
-                    ? `Selling from ${sellingDevice.current_branch}.`
-                    : `${branchDevices.length} phone${branchDevices.length === 1 ? '' : 's'} in stock across all stores.`}
-              </div>
-            </Field>
-          ) : (
-            <>
-              <Field label="Which accessory / part *">
-                <select className="form-input" value={partId} onChange={(e) => setPartId(e.target.value)} required>
-                  <option value="">Choose an item…</option>
-                  {branchParts.map((p) => (
-                    <option key={p.part_id} value={p.part_id}>
-                      {p.part_name} · {peso(p.service_price)} · {p.branch_location} · {p.stock_qty} on hand
+            {mode === 'device' ? (
+              <Field label="Which phone *">
+                <select className="form-input" value={imei} onChange={(e) => setImei(e.target.value)} required>
+                  <option value="">Choose a phone…</option>
+                  {sellableDevices.map((g) => (
+                    <option key={g.item_id} value={g.imei_1}>
+                      {g.brand} {g.model} · {g.color} · {peso(g.retail_price)} · {g.current_branch} · {g.imei_1}
                     </option>
                   ))}
                 </select>
-                {sellingPart && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                    Selling from {sellingPart.branch_location}.
-                  </div>
-                )}
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                  {sellableDevices.length === 0
+                    ? 'No phones in stock at any store yet.'
+                    : sellingDevice
+                      ? `Selling from ${sellingDevice.current_branch}.`
+                      : `${sellableDevices.length} in stock across all stores.`}
+                </div>
               </Field>
-              <Field label="Quantity *">
-                <input className="form-input" type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} required />
-              </Field>
-            </>
-          )}
+            ) : (
+              <>
+                <Field label="Which accessory / part *">
+                  <select className="form-input" value={partId} onChange={(e) => setPartId(e.target.value)} required>
+                    <option value="">Choose an item…</option>
+                    {sellableParts.map((p) => (
+                      <option key={p.part_id} value={p.part_id}>
+                        {p.part_name} · {peso(p.service_price)} · {p.branch_location} · {p.stock_qty} on hand
+                      </option>
+                    ))}
+                  </select>
+                  {sellingPart && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                      Selling from {sellingPart.branch_location}.
+                    </div>
+                  )}
+                </Field>
+                <Field label="Quantity *">
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="1"
+                    max={sellingPart?.stock_qty}
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value)}
+                    required
+                  />
+                </Field>
+              </>
+            )}
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', height: 48 }} disabled={busy}>
-            {busy ? 'Processing…' : 'Confirm sale & deduct stock'}
-          </button>
-        </form>
-      </div>
+            <Field label={mode === 'accessory' ? 'Price each *' : 'Price *'}>
+              <input
+                className="form-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                required
+              />
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                {lineQty > 1 ? `Total ${peso(lineTotal)}.` : 'Change it if you gave a discount.'}
+              </div>
+            </Field>
 
-      <div className="glass-panel" style={{ padding: 24, display: 'flex', flexDirection: 'column' }}>
-        <h2>Receipt</h2>
-        {invoice ? (
-          <div
-            style={{
-              padding: 24,
-              background: '#0e1420',
-              border: '1px dashed var(--border-color)',
-              borderRadius: 12,
-              fontFamily: 'monospace',
-              fontSize: '0.9rem',
-              color: '#a5f3fc',
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
+            <Field label="Paid with *">
+              <select
+                className="form-input"
+                value={payment}
+                onChange={(e) => setPayment(e.target.value as PaymentMethod)}
+              >
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Customer">
+              <input
+                className="form-input"
+                value={customer}
+                onChange={(e) => setCustomer(e.target.value)}
+                placeholder="For warranty follow-ups"
+              />
+            </Field>
+
+            <Field label="Sold by *">
+              <input className="form-input" value={cashier} onChange={(e) => setCashier(e.target.value)} required />
+            </Field>
+
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', height: 48 }} disabled={busy}>
+              {busy ? 'Processing…' : lineTotal > 0 ? `Take ${peso(lineTotal)}` : 'Confirm sale & deduct stock'}
+            </button>
+          </form>
+        </div>
+
+        <div className="glass-panel" style={{ padding: 24, display: 'flex', flexDirection: 'column' }}>
+          <h2>Receipt</h2>
+          {invoice ? (
             <div
               style={{
-                textAlign: 'center',
-                borderBottom: '1px dashed rgba(255,255,255,0.1)',
-                paddingBottom: 16,
-                marginBottom: 16,
+                padding: 24,
+                background: '#0e1420',
+                border: '1px dashed var(--border-color)',
+                borderRadius: 12,
+                fontFamily: 'monospace',
+                fontSize: '0.9rem',
+                color: '#a5f3fc',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
               }}
             >
-              <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#fff' }}>{invoice.branch}</div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Official sales record</div>
+              <div
+                style={{
+                  textAlign: 'center',
+                  borderBottom: '1px dashed rgba(255,255,255,0.1)',
+                  paddingBottom: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#fff' }}>{invoice.branch_location}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Official sales record</div>
+              </div>
+
+              <Line k="Invoice no" v={invoice.invoice_no} />
+              <Line k="Date" v={new Date(invoice.sold_at).toLocaleString()} />
+              <Line k="Paid with" v={invoice.payment_method} />
+              <Line k="Sold by" v={invoice.cashier} />
+              {invoice.customer_name ? <Line k="Customer" v={invoice.customer_name} /> : null}
+
+              <div
+                style={{
+                  borderTop: '1px dashed rgba(255,255,255,0.1)',
+                  borderBottom: '1px dashed rgba(255,255,255,0.1)',
+                  padding: '16px 0',
+                  margin: '16px 0',
+                }}
+              >
+                <div style={{ fontWeight: 'bold', color: '#fff', marginBottom: 4 }}>{invoice.description}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  {invoice.item_type === 'Serialized'
+                    ? `IMEI: ${invoice.reference_identifier}`
+                    : `SKU: ${invoice.reference_identifier} × ${invoice.quantity} @ ${peso(invoice.unit_price)}`}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '1.15rem',
+                  fontWeight: 'bold',
+                  color: '#fff',
+                  marginTop: 'auto',
+                }}
+              >
+                <span>TOTAL</span>
+                <span>{peso(invoice.total_amount)}</span>
+              </div>
+
+              <button className="btn btn-secondary" style={{ marginTop: 20 }} onClick={() => window.print()}>
+                <FileText size={16} /> Print
+              </button>
             </div>
-            <Line k="Invoice no" v={invoice.no} />
-            <Line k="Date" v={invoice.time} />
-            <Line k="Type" v={invoice.type} />
-            <div
-              style={{
-                borderTop: '1px dashed rgba(255,255,255,0.1)',
-                borderBottom: '1px dashed rgba(255,255,255,0.1)',
-                padding: '16px 0',
-                margin: '16px 0',
-              }}
-            >
-              <div style={{ fontWeight: 'bold', color: '#fff', marginBottom: 4 }}>{invoice.item}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{invoice.identifier}</div>
-            </div>
+          ) : (
             <div
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '1.15rem',
-                fontWeight: 'bold',
-                color: '#fff',
-                marginTop: 'auto',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flex: 1,
+                border: '2px dashed var(--border-color)',
+                borderRadius: 12,
+                padding: 40,
+                textAlign: 'center',
+                color: 'var(--text-muted)',
               }}
             >
-              <span>TOTAL</span>
-              <span>{peso(invoice.total)}</span>
+              <FileText size={44} style={{ marginBottom: 16, opacity: 0.5 }} />
+              <p>Complete a sale to generate a receipt.</p>
             </div>
-            <button className="btn btn-secondary" style={{ marginTop: 20 }} onClick={() => window.print()}>
-              <FileText size={16} /> Print
-            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="glass-panel" style={{ padding: 24 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <h2 style={{ margin: 0 }}>Sales history</h2>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            {peso(grossToday)} today · {completed.length} completed sale{completed.length === 1 ? '' : 's'} on record
           </div>
-        ) : (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flex: 1,
-              border: '2px dashed var(--border-color)',
-              borderRadius: 12,
-              padding: 40,
-              textAlign: 'center',
-              color: 'var(--text-muted)',
-            }}
-          >
-            <FileText size={44} style={{ marginBottom: 16, opacity: 0.5 }} />
-            <p>Complete a sale to generate a receipt.</p>
-          </div>
-        )}
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>When</th>
+                <th>Item</th>
+                <th>Branch</th>
+                <th>Paid</th>
+                <th>Sold by</th>
+                <th style={{ textAlign: 'right' }}>Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sales.map((s) => (
+                <tr key={s.sale_id} style={s.status === 'Voided' ? { opacity: 0.55 } : undefined}>
+                  <td style={{ fontFamily: 'monospace' }}>{s.invoice_no}</td>
+                  <td>{new Date(s.sold_at).toLocaleString()}</td>
+                  <td>
+                    {s.description}
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {s.reference_identifier}
+                      {s.quantity > 1 ? ` × ${s.quantity}` : ''}
+                      {s.customer_name ? ` · ${s.customer_name}` : ''}
+                    </div>
+                  </td>
+                  <td>{s.branch_location}</td>
+                  <td>{s.status === 'Voided' ? '—' : s.payment_method}</td>
+                  <td>{s.cashier}</td>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {s.status === 'Voided' ? (
+                      <span style={{ color: 'var(--color-danger)' }}>Voided</span>
+                    ) : (
+                      peso(s.total_amount)
+                    )}
+                  </td>
+                  <td>
+                    {s.status === 'Completed' ? (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: '6px 10px' }}
+                        disabled={busy}
+                        onClick={() => voidSale(s)}
+                      >
+                        Void
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+              <EmptyRow span={8} show={sales.length === 0} text="No sales recorded yet." />
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

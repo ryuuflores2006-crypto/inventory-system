@@ -95,5 +95,41 @@ export interface BranchTransfer {
   updated_at: string;
 }
 
+export type PaymentMethod = 'Cash' | 'GCash' | 'Card' | 'Bank Transfer' | 'Installment';
+
+export const PAYMENT_METHODS: PaymentMethod[] = ['Cash', 'GCash', 'Card', 'Bank Transfer', 'Installment'];
+
+/**
+ * A sale that actually happened.
+ *
+ * Rows here are written only by the `record_sale` database function, never by
+ * a client — the stock move and the money have to land together. Voiding keeps
+ * the row and puts the stock back, so takings always add up.
+ */
+export interface Sale {
+  sale_id: string;
+  invoice_no: string;
+  branch_location: string;
+  item_type: ItemType;
+  reference_identifier: string;
+  description: string;
+  item_id?: string | null;
+  part_id?: string | null;
+  quantity: number;
+  unit_price: number;
+  total_amount: number;
+  cost_total: number;
+  payment_method: PaymentMethod;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  cashier: string;
+  notes?: string | null;
+  status: 'Completed' | 'Voided';
+  void_reason?: string | null;
+  voided_by?: string | null;
+  voided_at?: string | null;
+  sold_at: string;
+}
+
 export const peso = (n: number | string) =>
   `₱${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
