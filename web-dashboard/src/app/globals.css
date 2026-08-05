@@ -28,6 +28,16 @@
   --accent-amber: #f59e0b;
   --accent-rose: #f43f5e;
 
+  /* Legacy aliases for page.tsx inline styles */
+  --color-primary: var(--accent-cyan);
+  --color-primary-hover: var(--accent-cyan-hover);
+  --color-primary-soft: var(--accent-cyan-glow);
+  --color-success: var(--accent-emerald);
+  --color-warning: var(--accent-amber);
+  --color-danger: var(--accent-rose);
+  --color-info: var(--accent-cyan);
+  --color-violet: var(--accent-violet);
+
   /* Radii & Shadows */
   --radius-sm: 8px;
   --radius-md: 12px;
