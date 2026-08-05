@@ -199,7 +199,7 @@ private fun AuthShell(
                                 onSuccess()
                             } catch (e: Exception) {
                                 e.printStackTrace()
-                                error = e.localizedMessage ?: "Something went wrong. Try again."
+                                error = e.localizedMessage?.substringBefore('\n') ?: "Something went wrong. Try again."
                             } finally {
                                 isLoading = false
                             }
