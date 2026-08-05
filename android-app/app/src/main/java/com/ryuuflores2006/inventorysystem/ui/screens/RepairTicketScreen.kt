@@ -49,8 +49,8 @@ fun RepairTicketScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
             if (!showIntake) {
                 ExtendedFloatingActionButton(
                     onClick = { showIntake = true },
-                    containerColor = Cyan,
-                    contentColor = DeepSpace,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     icon = { Icon(Icons.Default.Build, contentDescription = null) },
                     text = { Text("New repair") }
                 )
@@ -101,7 +101,7 @@ private fun RepairQueue(snackbar: SnackbarHostState) {
             subtitle = "${LiveStore.openTickets.size} open of ${LiveStore.tickets.size}",
             trailing = {
                 IconButton(onClick = { scope.launch { LiveStore.refresh() } }) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Ash)
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -160,7 +160,7 @@ private fun TicketCard(ticket: ServiceTicket, onStatusChange: (String) -> Unit) 
                 Text(
                     "${ticket.customer_name} · ${ticket.phone_number}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Ash
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Box(
@@ -173,7 +173,7 @@ private fun TicketCard(ticket: ServiceTicket, onStatusChange: (String) -> Unit) 
                 DropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
-                    modifier = Modifier.background(GlassSurfaceRaised)
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     TICKET_STATUSES.forEach { status ->
                         DropdownMenuItem(
@@ -203,7 +203,7 @@ private fun TicketCard(ticket: ServiceTicket, onStatusChange: (String) -> Unit) 
         Text(
             ticket.issue_description,
             style = MaterialTheme.typography.bodyMedium,
-            color = Ash,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = if (expanded) Int.MAX_VALUE else 2
         )
 
@@ -213,7 +213,7 @@ private fun TicketCard(ticket: ServiceTicket, onStatusChange: (String) -> Unit) 
             Text(
                 ticket.branch_location,
                 style = MaterialTheme.typography.labelMedium,
-                color = Cyan,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f)
             )
             Text(peso(ticket.total_amount), style = MaterialTheme.typography.titleLarge)
@@ -229,7 +229,7 @@ private fun TicketCard(ticket: ServiceTicket, onStatusChange: (String) -> Unit) 
             OutlinedButton(
                 onClick = { menuOpen = true },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                 border = androidx.compose.foundation.BorderStroke(1.dp, GlassBorder)
             ) {
                 Text("Change status")
@@ -278,7 +278,7 @@ private fun RepairIntakeForm(
             title = "New repair",
             subtitle = "Book a customer device in",
             trailing = {
-                TextButton(onClick = onCancel) { Text("Cancel", color = Ash) }
+                TextButton(onClick = onCancel) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         )
 
@@ -322,8 +322,8 @@ private fun RepairIntakeForm(
                     }
                 },
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = GlassSurfaceRaised,
-                    contentColor = Cyan
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.primary
                 ),
                 modifier = Modifier
                     .padding(top = 6.dp)

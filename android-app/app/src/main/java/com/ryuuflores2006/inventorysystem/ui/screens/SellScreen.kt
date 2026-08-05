@@ -23,8 +23,6 @@ import com.ryuuflores2006.inventorysystem.data.SaleOutcome
 import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.ui.components.*
 import com.ryuuflores2006.inventorysystem.ui.theme.Amber
-import com.ryuuflores2006.inventorysystem.ui.theme.Ash
-import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
 import com.ryuuflores2006.inventorysystem.ui.theme.Emerald
 import com.ryuuflores2006.inventorysystem.ui.theme.Rose
 import kotlinx.coroutines.launch
@@ -192,11 +190,11 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 trailing = {
                     if (chosen) {
                         TextButton(onClick = { selected = ""; search = "" }) {
-                            Text("Change", color = Cyan)
+                            Text("Change", color = MaterialTheme.colorScheme.primary)
                         }
                     } else {
                         IconButton(onClick = { onScanClick { scanned -> selected = scanned } }) {
-                            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan", tint = Cyan)
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan", tint = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -228,7 +226,7 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 suggestions.isNotEmpty() -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         if (search.isBlank()) "Tap what you are selling" else "Did you mean",
-                        color = Ash,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
                     suggestions.forEach { c ->
@@ -237,7 +235,7 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Text(c.title, style = MaterialTheme.typography.titleSmall)
-                            Text(c.detail, color = Ash, style = MaterialTheme.typography.bodySmall)
+                            Text(c.detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -343,7 +341,7 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                                 sale.payment_method.takeIf { !sale.isVoided },
                                 "by ${sale.cashier}"
                             ).joinToString(" · "),
-                            color = Ash,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
                         if (!sale.isVoided) {
@@ -402,7 +400,7 @@ private fun SoldItemCard(heading: String, lines: List<String>) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(heading, color = Emerald, style = MaterialTheme.typography.titleMedium)
             lines.filter { it.isNotBlank() }.forEach {
-                Text(it, color = Ash, style = MaterialTheme.typography.bodySmall)
+                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -425,12 +423,12 @@ private fun ReceiptDialog(sale: Sale, onClose: () -> Unit) {
                     },
                     color = Emerald
                 )
-                Text("${sale.payment_method} · ${sale.branch_location}", color = Ash)
-                sale.customer_name?.takeIf { it.isNotBlank() }?.let { Text("For $it", color = Ash) }
-                Text("Sold by ${sale.cashier}", color = Ash)
+                Text("${sale.payment_method} · ${sale.branch_location}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                sale.customer_name?.takeIf { it.isNotBlank() }?.let { Text("For $it", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Text("Sold by ${sale.cashier}", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        confirmButton = { TextButton(onClick = onClose) { Text("Done", color = Cyan) } }
+        confirmButton = { TextButton(onClick = onClose) { Text("Done", color = MaterialTheme.colorScheme.primary) } }
     )
 }
 
@@ -457,7 +455,7 @@ private fun VoidDialog(sale: Sale, onDismiss: () -> Unit, onConfirm: (String) ->
         confirmButton = {
             TextButton(onClick = { onConfirm(reason.trim()) }) { Text("Void", color = Rose) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Keep", color = Ash) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Keep", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
     )
 }
 

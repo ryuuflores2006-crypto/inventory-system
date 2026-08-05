@@ -39,10 +39,6 @@ import com.ryuuflores2006.inventorysystem.ui.screens.RepairTicketScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.SellScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.StockInScreen
 import com.ryuuflores2006.inventorysystem.ui.screens.UpdateDialog
-import com.ryuuflores2006.inventorysystem.ui.theme.Ash
-import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
-import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
-import com.ryuuflores2006.inventorysystem.ui.theme.GlassBase
 import com.ryuuflores2006.inventorysystem.ui.theme.InventorySystemTheme
 import kotlinx.coroutines.launch
 
@@ -165,24 +161,24 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
             TopAppBar(
                 title = { Text("J-LOU Inventory", style = MaterialTheme.typography.titleLarge) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = GlassBase,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 actions = {
                     LivePill(isLive = LiveStore.isLive, modifier = Modifier.padding(end = 4.dp))
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Ash)
+                            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         DropdownMenu(
                             expanded = menuOpen,
                             onDismissRequest = { menuOpen = false },
-                            modifier = Modifier.background(GlassSurfaceRaised)
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Check for updates") },
                                 leadingIcon = {
-                                    Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = Cyan)
+                                    Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 },
                                 onClick = {
                                     menuOpen = false
@@ -192,7 +188,7 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
                             DropdownMenuItem(
                                 text = { Text("Sign out") },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Logout, contentDescription = null, tint = Ash)
+                                    Icon(Icons.Default.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 },
                                 onClick = {
                                     menuOpen = false
@@ -205,7 +201,7 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
             )
         },
         bottomBar = {
-            NavigationBar(containerColor = GlassBase) {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                 TABS.forEachIndexed { index, tab ->
                     NavigationBarItem(
                         selected = currentTab == index,
@@ -213,11 +209,11 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
                         label = { Text(tab.label, style = MaterialTheme.typography.labelSmall) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Cyan,
-                            selectedTextColor = Cyan,
-                            unselectedIconColor = Ash,
-                            unselectedTextColor = Ash,
-                            indicatorColor = Cyan.copy(alpha = 0.14f)
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                         )
                     )
                 }

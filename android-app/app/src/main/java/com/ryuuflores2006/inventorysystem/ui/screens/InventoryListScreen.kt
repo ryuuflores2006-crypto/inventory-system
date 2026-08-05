@@ -77,7 +77,7 @@ fun InventoryListScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
             subtitle = if (branch == null) "All branches" else branch,
             trailing = {
                 IconButton(onClick = { scope.launch { LiveStore.refresh() } }) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Ash)
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -93,8 +93,8 @@ fun InventoryListScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
             FilledTonalIconButton(
                 onClick = { onScanClick { scanned -> searchQuery = scanned } },
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = GlassSurfaceRaised,
-                    contentColor = Cyan
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.primary
                 ),
                 modifier = Modifier.size(56.dp)
             ) {
@@ -111,21 +111,21 @@ fun InventoryListScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
         TabRow(
             selectedTabIndex = if (showParts) 1 else 0,
             containerColor = MaterialTheme.colorScheme.background,
-            contentColor = Cyan,
-            divider = { HorizontalDivider(color = GlassSurfaceRaised) }
+            contentColor = MaterialTheme.colorScheme.primary,
+            divider = { HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant) }
         ) {
             Tab(
                 selected = !showParts,
                 onClick = { showParts = false },
-                selectedContentColor = Cyan,
-                unselectedContentColor = Ash,
+                selectedContentColor = MaterialTheme.colorScheme.primary,
+                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 text = { Text("Devices (${LiveStore.gadgetsIn(branch).size})", fontWeight = FontWeight.SemiBold) }
             )
             Tab(
                 selected = showParts,
                 onClick = { showParts = true },
-                selectedContentColor = Cyan,
-                unselectedContentColor = Ash,
+                selectedContentColor = MaterialTheme.colorScheme.primary,
+                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 text = { Text("Parts (${LiveStore.partsIn(branch).size})", fontWeight = FontWeight.SemiBold) }
             )
         }
@@ -184,7 +184,7 @@ fun GadgetItemCard(gadget: RetailGadget) {
                     listOf(gadget.storage, gadget.ram, gadget.color).filter { it.isNotBlank() }
                         .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Ash
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             StatusPill(gadget.status, gadgetStatusColor(gadget.status))
@@ -196,7 +196,7 @@ fun GadgetItemCard(gadget: RetailGadget) {
             Text(
                 gadget.current_branch,
                 style = MaterialTheme.typography.labelMedium,
-                color = Cyan,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
@@ -246,7 +246,7 @@ fun PartItemCard(part: RepairPart) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(part.part_name, style = MaterialTheme.typography.titleLarge)
-                Text(part.sku, style = MaterialTheme.typography.bodySmall, color = Ash)
+                Text(part.sku, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             StatusPill("${part.stock_qty} in stock", stockColor)
         }
@@ -257,7 +257,7 @@ fun PartItemCard(part: RepairPart) {
             Text(
                 part.branch_location,
                 style = MaterialTheme.typography.labelMedium,
-                color = Cyan,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
@@ -310,7 +310,7 @@ private fun RemoveRow(
     HorizontalDivider(color = GlassBorder, modifier = Modifier.padding(vertical = 8.dp))
 
     if (blocked != null) {
-        Text(blocked, style = MaterialTheme.typography.bodySmall, color = Ash)
+        Text(blocked, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
 

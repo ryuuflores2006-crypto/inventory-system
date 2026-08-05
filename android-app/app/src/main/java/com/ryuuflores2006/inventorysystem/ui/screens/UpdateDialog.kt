@@ -10,11 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ryuuflores2006.inventorysystem.data.UpdateManager
-import com.ryuuflores2006.inventorysystem.ui.theme.Ash
-import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
-import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
-import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurface
-import com.ryuuflores2006.inventorysystem.ui.theme.DeepSpace
 import kotlinx.coroutines.launch
 
 /**
@@ -35,28 +30,28 @@ fun UpdateDialog() {
             val release = state.release
             AlertDialog(
                 onDismissRequest = { if (!release.is_mandatory) UpdateManager.dismiss() },
-                containerColor = GlassSurface,
-                icon = { Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = Cyan) },
+                containerColor = MaterialTheme.colorScheme.surface,
+                icon = { Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 title = { Text("Update to ${release.version_name}") },
                 text = {
                     Column {
                         Text(
                             release.release_notes?.takeIf { it.isNotBlank() }
                                 ?: "A newer build of the app is available.",
-                            color = Ash,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
                             "You are on ${UpdateManager.installedVersionName(context)}.",
-                            color = Ash,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
                         if (release.is_mandatory) {
                             Spacer(Modifier.height(8.dp))
                             Text(
                                 "This update is required.",
-                                color = Cyan,
+                                color = MaterialTheme.colorScheme.primary,
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -64,13 +59,13 @@ fun UpdateDialog() {
                 },
                 confirmButton = {
                     Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = DeepSpace),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                         onClick = { scope.launch { UpdateManager.download(context, release) } }
                     ) { Text("Download") }
                 },
                 dismissButton = {
                     if (!release.is_mandatory) {
-                        TextButton(onClick = { UpdateManager.dismiss() }) { Text("Later", color = Ash) }
+                        TextButton(onClick = { UpdateManager.dismiss() }) { Text("Later", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                 }
             )
@@ -79,7 +74,7 @@ fun UpdateDialog() {
         is UpdateManager.State.Downloading -> {
             AlertDialog(
                 onDismissRequest = { },
-                containerColor = GlassSurface,
+                containerColor = MaterialTheme.colorScheme.surface,
                 title = { Text("Downloading ${state.release.version_name}") },
                 text = {
                     Column {
@@ -87,20 +82,20 @@ fun UpdateDialog() {
                             LinearProgressIndicator(
                                 progress = { state.progress },
                                 modifier = Modifier.fillMaxWidth(),
-                                color = Cyan,
-                                trackColor = GlassSurfaceRaised
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
                                 "${(state.progress * 100).toInt()}%",
-                                color = Ash,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall
                             )
                         } else {
                             LinearProgressIndicator(
                                 modifier = Modifier.fillMaxWidth(),
-                                color = Cyan,
-                                trackColor = GlassSurfaceRaised
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                         }
                     }
@@ -113,8 +108,8 @@ fun UpdateDialog() {
             val allowed = UpdateManager.canInstall(context)
             AlertDialog(
                 onDismissRequest = { },
-                containerColor = GlassSurface,
-                icon = { Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = Cyan) },
+                containerColor = MaterialTheme.colorScheme.surface,
+                icon = { Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 title = { Text("Ready to install") },
                 text = {
                     Text(
@@ -125,13 +120,13 @@ fun UpdateDialog() {
                             "Android needs permission to install apps from this app. " +
                                 "Turn it on, then come back and tap Install."
                         },
-                        color = Ash,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 },
                 confirmButton = {
                     Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = DeepSpace),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                         onClick = {
                             if (allowed) {
                                 UpdateManager.install(context, state.file)
@@ -142,7 +137,7 @@ fun UpdateDialog() {
                     ) { Text(if (allowed) "Install" else "Open settings") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { UpdateManager.dismiss() }) { Text("Later", color = Ash) }
+                    TextButton(onClick = { UpdateManager.dismiss() }) { Text("Later", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
             )
         }
@@ -150,11 +145,11 @@ fun UpdateDialog() {
         is UpdateManager.State.Failed -> {
             AlertDialog(
                 onDismissRequest = { UpdateManager.clearError() },
-                containerColor = GlassSurface,
+                containerColor = MaterialTheme.colorScheme.surface,
                 title = { Text("Update") },
-                text = { Text(state.message, color = Ash) },
+                text = { Text(state.message, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 confirmButton = {
-                    TextButton(onClick = { UpdateManager.clearError() }) { Text("OK", color = Cyan) }
+                    TextButton(onClick = { UpdateManager.clearError() }) { Text("OK", color = MaterialTheme.colorScheme.primary) }
                 }
             )
         }

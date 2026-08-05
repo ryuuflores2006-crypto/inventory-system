@@ -66,7 +66,7 @@ fun HomeScreen(onOpenInventory: () -> Unit, onOpenRepairs: () -> Unit) {
                 subtitle = if (branch == null) "All branches" else branch,
                 trailing = {
                     IconButton(onClick = { scope.launch { LiveStore.refresh() } }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Ash)
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             )
@@ -91,7 +91,7 @@ fun HomeScreen(onOpenInventory: () -> Unit, onOpenRepairs: () -> Unit) {
                     value = inStock.toString(),
                     caption = peso(stockValue) + " retail",
                     icon = Icons.Default.Inventory2,
-                    tint = Cyan,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                     onClick = onOpenInventory
                 )
@@ -154,7 +154,7 @@ fun HomeScreen(onOpenInventory: () -> Unit, onOpenRepairs: () -> Unit) {
                             Text(
                                 "${part.branch_location} · ${part.sku}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Ash
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         StatusPill(
@@ -169,7 +169,7 @@ fun HomeScreen(onOpenInventory: () -> Unit, onOpenRepairs: () -> Unit) {
                     Text(
                         "+ ${lowStock.size - 6} more running low",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Ash
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -185,7 +185,7 @@ fun HomeScreen(onOpenInventory: () -> Unit, onOpenRepairs: () -> Unit) {
                             Text(
                                 "${ticket.customer_name} · ${ticket.branch_location}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Ash
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         StatusPill(
@@ -218,7 +218,7 @@ fun CountLabel(count: Int, noun: String) {
     Text(
         "$count $noun",
         style = MaterialTheme.typography.labelMedium,
-        color = Ash,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         fontWeight = FontWeight.SemiBold
     )
 }

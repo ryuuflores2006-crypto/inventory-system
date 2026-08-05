@@ -40,8 +40,8 @@ fun BranchScreen() {
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAddDialog = true },
-                containerColor = Cyan,
-                contentColor = DeepSpace,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("Add branch") }
             )
@@ -108,19 +108,19 @@ fun BranchScreen() {
     pendingArchive?.let { branch ->
         AlertDialog(
             onDismissRequest = { pendingArchive = null },
-            containerColor = GlassSurface,
+            containerColor = MaterialTheme.colorScheme.surface,
             title = { Text("Archive ${branch.name}?") },
             text = {
                 Text(
                     "It disappears from every dropdown on the phone and the PC dashboard. " +
                         "Its stock, tickets and history are kept, and you can restore it " +
                         "from the Archived list below.",
-                    color = Ash
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
                 Button(
-                    colors = ButtonDefaults.buttonColors(containerColor = Rose, contentColor = Chalk),
+                    colors = ButtonDefaults.buttonColors(containerColor = Rose, contentColor = MaterialTheme.colorScheme.onSurface),
                     onClick = {
                         pendingArchive = null
                         scope.launch {
@@ -131,7 +131,7 @@ fun BranchScreen() {
                 ) { Text("Archive") }
             },
             dismissButton = {
-                TextButton(onClick = { pendingArchive = null }) { Text("Cancel", color = Ash) }
+                TextButton(onClick = { pendingArchive = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         )
     }
@@ -179,20 +179,20 @@ private fun BranchCard(
                     Text(
                         details.joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
-                        color = Ash,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
             }
             TextButton(onClick = onAction) {
-                Text(actionLabel, color = if (dimmed) Cyan else Ash)
+                Text(actionLabel, color = if (dimmed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
         if (!dimmed) {
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusPill("$devices devices", Cyan, dense = true)
+                StatusPill("$devices devices", MaterialTheme.colorScheme.primary, dense = true)
                 StatusPill("$parts part lines", Azure, dense = true)
                 StatusPill("$open open repairs", if (open > 0) Violet else Slate, dense = true)
             }
@@ -212,7 +212,7 @@ private fun AddBranchDialog(onDismiss: () -> Unit, onAdded: (String) -> Unit) {
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        containerColor = GlassSurface,
+        containerColor = MaterialTheme.colorScheme.surface,
         title = { Text("Add branch") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -226,7 +226,7 @@ private fun AddBranchDialog(onDismiss: () -> Unit, onAdded: (String) -> Unit) {
         confirmButton = {
             Button(
                 enabled = !busy && name.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = DeepSpace),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                 onClick = {
                     busy = true
                     error = null
@@ -241,7 +241,7 @@ private fun AddBranchDialog(onDismiss: () -> Unit, onAdded: (String) -> Unit) {
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancel", color = Ash) }
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     )
 }

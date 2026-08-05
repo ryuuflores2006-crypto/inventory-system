@@ -19,9 +19,6 @@ import com.ryuuflores2006.inventorysystem.data.ScanResolver
 import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.data.TacLookup
 import com.ryuuflores2006.inventorysystem.ui.components.*
-import com.ryuuflores2006.inventorysystem.ui.theme.Ash
-import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
-import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
 import kotlinx.coroutines.launch
 
 /**
@@ -228,8 +225,8 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                             }
                         },
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = GlassSurfaceRaised,
-                            contentColor = Cyan
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.primary
                         ),
                         modifier = Modifier
                             .padding(top = 6.dp)
@@ -296,7 +293,7 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 Text(
                     "Margin ${peso(margin)} per unit",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Ash
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -379,10 +376,10 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun segmentColors() = SegmentedButtonDefaults.colors(
-    activeContainerColor = Cyan.copy(alpha = 0.16f),
-    activeContentColor = Cyan,
-    activeBorderColor = Cyan.copy(alpha = 0.5f),
-    inactiveContainerColor = GlassSurfaceRaised,
-    inactiveContentColor = Ash,
+    activeContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+    activeContentColor = MaterialTheme.colorScheme.primary,
+    activeBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+    inactiveContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+    inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
     inactiveBorderColor = com.ryuuflores2006.inventorysystem.ui.theme.GlassBorder
 )

@@ -38,12 +38,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.ryuuflores2006.inventorysystem.ui.theme.Ash
-import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
 import com.ryuuflores2006.inventorysystem.ui.theme.Emerald
 import com.ryuuflores2006.inventorysystem.ui.theme.GlassBorder
-import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
-import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurface
 
 /**
  * The shared building blocks. Every screen is assembled from these so spacing,
@@ -66,8 +62,8 @@ fun AppCard(
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        GlassSurface,
-                        GlassSurface.copy(alpha = 0.4f)
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
                     )
                 )
             )
@@ -115,7 +111,7 @@ fun LivePill(isLive: Boolean, modifier: Modifier = Modifier) {
         animationSpec = infiniteRepeatable(tween(1100), RepeatMode.Reverse),
         label = "pulse"
     )
-    val color = if (isLive) Emerald else Ash
+    val color = if (isLive) Emerald else MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = modifier
             .clip(CircleShape)
@@ -159,7 +155,7 @@ fun ScreenHeader(
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Ash,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
@@ -174,7 +170,7 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelSmall,
-        color = Ash,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier.padding(top = 20.dp, bottom = 8.dp)
     )
 }
@@ -200,27 +196,27 @@ fun AppTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        placeholder = placeholder?.let { { Text(it, color = Ash) } },
+        placeholder = placeholder?.let { { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) } },
         modifier = modifier.fillMaxWidth(),
         singleLine = singleLine,
         minLines = minLines,
         isError = isError,
         enabled = enabled,
         supportingText = supportingText?.let { { Text(it) } },
-        leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null, tint = Ash) } },
+        leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) } },
         trailingIcon = trailing,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = GlassSurfaceRaised,
-            unfocusedContainerColor = GlassSurfaceRaised,
-            disabledContainerColor = GlassSurfaceRaised,
-            errorContainerColor = GlassSurfaceRaised,
-            focusedBorderColor = Cyan,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            errorContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
             unfocusedBorderColor = GlassBorder,
-            focusedLabelColor = Cyan,
-            unfocusedLabelColor = Ash,
-            cursorColor = Cyan
+            focusedLabelColor = MaterialTheme.colorScheme.primary,
+            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            cursorColor = MaterialTheme.colorScheme.primary
         )
     )
 }
@@ -236,8 +232,8 @@ fun SearchField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder, color = Ash, style = MaterialTheme.typography.bodyMedium) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Ash) },
+        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
         trailingIcon = {
             if (value.isNotEmpty()) {
                 TextButton(onClick = { onValueChange("") }) { Text("Clear") }
@@ -247,11 +243,11 @@ fun SearchField(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = GlassSurfaceRaised,
-            unfocusedContainerColor = GlassSurfaceRaised,
-            focusedBorderColor = Cyan,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
             unfocusedBorderColor = GlassBorder,
-            cursorColor = Cyan
+            cursorColor = MaterialTheme.colorScheme.primary
         )
     )
 }
@@ -280,32 +276,32 @@ fun AppDropdown(
             readOnly = true,
             enabled = enabled,
             label = { Text(label) },
-            trailingIcon = { Icon(Icons.Default.ExpandMore, contentDescription = null, tint = Ash) },
+            trailingIcon = { Icon(Icons.Default.ExpandMore, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = GlassSurfaceRaised,
-                unfocusedContainerColor = GlassSurfaceRaised,
-                disabledContainerColor = GlassSurfaceRaised,
-                focusedBorderColor = Cyan,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = GlassBorder,
-                focusedLabelColor = Cyan,
-                unfocusedLabelColor = Ash,
-                disabledTextColor = Ash
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         )
         ExposedDropdownMenu(
             expanded = expanded && enabled && options.isNotEmpty(),
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(GlassSurfaceRaised)
+            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             options.forEach { option ->
                 DropdownMenuItem(
                     text = { Text(option) },
                     trailingIcon = {
-                        if (option == selected) Icon(Icons.Default.Check, null, tint = Cyan)
+                        if (option == selected) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
                     },
                     onClick = {
                         onSelect(option)
@@ -339,16 +335,16 @@ fun FilterChipRow(
                 label = { Text(option, style = MaterialTheme.typography.labelLarge) },
                 shape = CircleShape,
                 colors = FilterChipDefaults.filterChipColors(
-                    containerColor = GlassSurfaceRaised,
-                    labelColor = Ash,
-                    selectedContainerColor = Cyan.copy(alpha = 0.16f),
-                    selectedLabelColor = Cyan
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                    selectedLabelColor = MaterialTheme.colorScheme.primary
                 ),
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
                     selected = isSelected,
                     borderColor = GlassBorder,
-                    selectedBorderColor = Cyan.copy(alpha = 0.5f)
+                    selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                 )
             )
         }
@@ -373,17 +369,17 @@ fun PrimaryButton(
             .height(52.dp),
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Cyan,
-            contentColor = com.ryuuflores2006.inventorysystem.ui.theme.DeepSpace,
-            disabledContainerColor = GlassSurfaceRaised,
-            disabledContentColor = Ash
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = com.ryuuflores2006.inventorysystem.ui.theme.MaterialTheme.colorScheme.background,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
     ) {
         if (busy) {
             CircularProgressIndicator(
                 modifier = Modifier.size(18.dp),
                 strokeWidth = 2.dp,
-                color = com.ryuuflores2006.inventorysystem.ui.theme.DeepSpace
+                color = com.ryuuflores2006.inventorysystem.ui.theme.MaterialTheme.colorScheme.background
             )
             Spacer(Modifier.width(10.dp))
         } else if (icon != null) {
@@ -416,12 +412,12 @@ fun EmptyState(
                 .clip(CircleShape)
                 .background(
                     Brush.linearGradient(
-                        listOf(Cyan.copy(alpha = 0.16f), Cyan.copy(alpha = 0.04f))
+                        listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f), MaterialTheme.colorScheme.primary.copy(alpha = 0.04f))
                     )
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = null, tint = Cyan, modifier = Modifier.size(32.dp))
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
         }
         Spacer(Modifier.height(16.dp))
         Text(title, style = MaterialTheme.typography.titleLarge)
@@ -429,7 +425,7 @@ fun EmptyState(
         Text(
             message,
             style = MaterialTheme.typography.bodyMedium,
-            color = Ash,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
         if (actionLabel != null && onAction != null) {
@@ -438,8 +434,8 @@ fun EmptyState(
                 onClick = onAction,
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Cyan,
-                    contentColor = com.ryuuflores2006.inventorysystem.ui.theme.DeepSpace
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = com.ryuuflores2006.inventorysystem.ui.theme.MaterialTheme.colorScheme.background
                 )
             ) { Text(actionLabel) }
         }
@@ -463,7 +459,7 @@ fun LoadingCards(count: Int = 4, modifier: Modifier = Modifier) {
                     .fillMaxWidth()
                     .height(84.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(GlassSurfaceRaised.copy(alpha = alpha))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha))
             )
         }
     }
@@ -519,8 +515,8 @@ fun StatCard(
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        GlassSurface,
-                        GlassSurface.copy(alpha = 0.4f)
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
                     )
                 )
             )
@@ -543,7 +539,7 @@ fun StatCard(
             Text(
                 label,
                 style = MaterialTheme.typography.labelMedium,
-                color = Ash,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
         }
@@ -553,7 +549,7 @@ fun StatCard(
             Text(
                 caption,
                 style = MaterialTheme.typography.bodySmall,
-                color = Ash,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp)
             )
         }
@@ -572,7 +568,7 @@ fun DetailRow(label: String, value: String, valueColor: Color = Color.Unspecifie
         Text(
             label,
             style = MaterialTheme.typography.bodySmall,
-            color = Ash,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(96.dp)
         )
         Text(

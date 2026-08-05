@@ -22,9 +22,6 @@ import com.ryuuflores2006.inventorysystem.data.ScanResolver
 import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.ui.components.*
 import com.ryuuflores2006.inventorysystem.ui.theme.Amber
-import com.ryuuflores2006.inventorysystem.ui.theme.Ash
-import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
-import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
 import com.ryuuflores2006.inventorysystem.ui.theme.Emerald
 import kotlinx.coroutines.launch
 
@@ -192,7 +189,7 @@ fun TransferScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 placeholder = "Model, IMEI, part name or SKU",
                 trailing = {
                     IconButton(onClick = { onScanClick { scanned -> reference = scanned } }) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan", tint = Cyan)
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             )
@@ -223,7 +220,7 @@ fun TransferScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 ) {
                     Text(
                         if (reference.isBlank()) "Tap what you are sending" else "Did you mean",
-                        color = Ash,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
                     suggestions.forEach { candidate ->
@@ -234,7 +231,7 @@ fun TransferScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                             Text(candidate.title, style = MaterialTheme.typography.titleSmall)
                             Text(
                                 candidate.detail,
-                                color = Ash,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -323,12 +320,12 @@ fun TransferScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                             Text(
                                 "${transfer.source_branch} → ${transfer.destination_branch}" +
                                     if (transfer.quantity > 1) " · ${transfer.quantity} pcs" else "",
-                                color = Ash,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Text(
                                 "Released by ${transfer.dispatcher}",
-                                color = Ash,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall
                             )
                             OutlinedButton(
@@ -358,7 +355,7 @@ fun TransferScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(16.dp),
                                         strokeWidth = 2.dp,
-                                        color = Cyan
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                     Spacer(Modifier.width(8.dp))
                                 }
@@ -385,7 +382,7 @@ private fun IdentifiedCard(
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(heading, color = tint, style = MaterialTheme.typography.titleMedium)
             lines.forEach {
-                Text(it, color = Ash, style = MaterialTheme.typography.bodySmall)
+                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

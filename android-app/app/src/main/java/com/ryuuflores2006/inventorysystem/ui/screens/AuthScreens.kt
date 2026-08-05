@@ -26,10 +26,7 @@ import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.ui.components.AppTextField
 import com.ryuuflores2006.inventorysystem.ui.components.ErrorBanner
 import com.ryuuflores2006.inventorysystem.ui.components.PrimaryButton
-import com.ryuuflores2006.inventorysystem.ui.theme.Ash
-import com.ryuuflores2006.inventorysystem.ui.theme.Cyan
 import com.ryuuflores2006.inventorysystem.ui.theme.GlassBorder
-import com.ryuuflores2006.inventorysystem.ui.theme.GlassSurfaceRaised
 import io.github.jan.supabase.gotrue.providers.builtin.Email
 import kotlinx.coroutines.launch
 
@@ -111,14 +108,14 @@ private fun AuthShell(
                 .size(72.dp)
                 .clip(RoundedCornerShape(22.dp))
                 .background(
-                    Brush.linearGradient(listOf(Cyan.copy(alpha = 0.28f), Cyan.copy(alpha = 0.06f)))
+                    Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.28f), MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)))
                 ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Default.Storefront,
                 contentDescription = null,
-                tint = Cyan,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(34.dp)
             )
         }
@@ -129,7 +126,7 @@ private fun AuthShell(
         Text(
             subtitle,
             style = MaterialTheme.typography.bodyMedium,
-            color = Ash,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
 
@@ -154,13 +151,13 @@ private fun AuthShell(
             onValueChange = { password = it; error = null },
             label = { Text("Password") },
             singleLine = true,
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Ash) },
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             trailingIcon = {
                 IconButton(onClick = { showPassword = !showPassword }) {
                     Icon(
                         if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                         contentDescription = if (showPassword) "Hide password" else "Show password",
-                        tint = Ash
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             },
@@ -172,13 +169,13 @@ private fun AuthShell(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = GlassSurfaceRaised,
-                unfocusedContainerColor = GlassSurfaceRaised,
-                focusedBorderColor = Cyan,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = GlassBorder,
-                focusedLabelColor = Cyan,
-                unfocusedLabelColor = Ash,
-                cursorColor = Cyan
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                cursorColor = MaterialTheme.colorScheme.primary
             )
         )
 
@@ -215,8 +212,8 @@ private fun AuthShell(
         Spacer(Modifier.height(16.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(footerPrompt, style = MaterialTheme.typography.bodyMedium, color = Ash)
-            TextButton(onClick = onFooterClick) { Text(footerAction, color = Cyan) }
+            Text(footerPrompt, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = onFooterClick) { Text(footerAction, color = MaterialTheme.colorScheme.primary) }
         }
     }
 }

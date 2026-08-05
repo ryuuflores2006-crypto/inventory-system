@@ -233,11 +233,11 @@ fun BarcodeScanScreen(
                     .align(Alignment.Center)
                     .fillMaxWidth(0.86f)
                     .height(150.dp)
-                    .border(2.dp, Cyan, RoundedCornerShape(16.dp))
+                    .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
             )
             Text(
                 "Line the barcode or IMEI strip up inside the frame",
-                color = Chalk,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -260,7 +260,7 @@ fun BarcodeScanScreen(
                 onClick = onClose,
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                     containerColor = Color.Black.copy(alpha = 0.55f),
-                    contentColor = Chalk
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 )
             ) { Icon(Icons.Default.Close, contentDescription = "Close scanner") }
 
@@ -272,7 +272,7 @@ fun BarcodeScanScreen(
                     },
                     colors = IconButtonDefaults.filledTonalIconButtonColors(
                         containerColor = Color.Black.copy(alpha = 0.55f),
-                        contentColor = if (torchOn) Amber else Chalk
+                        contentColor = if (torchOn) Amber else MaterialTheme.colorScheme.onSurface
                     )
                 ) {
                     Icon(
@@ -328,7 +328,7 @@ private fun ScanResultCard(
             .fillMaxWidth()
             .padding(16.dp),
         shape = RoundedCornerShape(20.dp),
-        color = GlassSurface,
+        color = MaterialTheme.colorScheme.surface,
         tonalElevation = 6.dp
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
@@ -346,7 +346,7 @@ private fun ScanResultCard(
                 Text(
                     scan.value,
                     style = MaterialTheme.typography.titleMedium,
-                    color = Chalk
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -407,7 +407,7 @@ private fun ScanResultCard(
                             ).joinToString(" · "),
                             "The details will be filled in for you"
                         ),
-                        tint = Cyan
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
 
@@ -447,20 +447,20 @@ private fun ScanResultCard(
                                 "New to your stock — identified from the IMEI",
                                 tac!!.release_year?.let { "Released $it" }
                             ),
-                            tint = Cyan
+                            tint = MaterialTheme.colorScheme.primary
                         )
 
                         looking -> Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp,
-                                color = Cyan
+                                color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
                                 "Identifying the model…",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Ash
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -500,12 +500,12 @@ private fun ScanResultCard(
                 OutlinedButton(
                     onClick = onRescan,
                     modifier = Modifier.weight(1f)
-                ) { Text("Scan again", color = Ash) }
+                ) { Text("Scan again", color = MaterialTheme.colorScheme.onSurfaceVariant) }
 
                 Button(
                     onClick = onUse,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = DeepSpace)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                 ) { Text("Use this") }
             }
         }
@@ -524,9 +524,9 @@ private fun IdentityBlock(heading: String, lines: List<String>, tint: Color) {
         )
         Spacer(Modifier.width(12.dp))
         Column {
-            Text(heading, style = MaterialTheme.typography.titleLarge, color = Chalk)
+            Text(heading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
             lines.filter { it.isNotBlank() }.forEach {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = Ash)
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -553,14 +553,14 @@ private fun CameraPermissionNotice(
             "The scanner reads IMEI strips and SKU barcodes with the back camera. " +
                 "Nothing is recorded — frames are decoded and discarded.",
             style = MaterialTheme.typography.bodyMedium,
-            color = Ash,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(20.dp))
         Button(
             onClick = if (asked) onSettings else onGrant,
-            colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = DeepSpace)
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
         ) { Text(if (asked) "Open app settings" else "Allow camera") }
-        TextButton(onClick = onClose) { Text("Cancel", color = Ash) }
+        TextButton(onClick = onClose) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
