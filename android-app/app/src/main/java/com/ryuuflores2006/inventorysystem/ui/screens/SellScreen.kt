@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.ryuuflores2006.inventorysystem.data.BranchStore
 import com.ryuuflores2006.inventorysystem.data.LiveStore
 import com.ryuuflores2006.inventorysystem.data.RepairPart
 import com.ryuuflores2006.inventorysystem.data.RetailGadget
@@ -61,6 +62,7 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     var formError by remember { mutableStateOf<String?>(null) }
     var receipt by remember { mutableStateOf<Sale?>(null) }
     var voiding by remember { mutableStateOf<Sale?>(null) }
+    var myBranch by rememberSaveable { mutableStateOf(BranchStore.defaultName) }
 
     val gadget: RetailGadget? = remember(selected, LiveStore.gadgets) {
         selected.takeIf { it.isNotBlank() }?.let { ref ->
@@ -78,13 +80,13 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     // Same idea as the transfer screen: search what is sellable rather than
     // demanding the exact code, and with an empty box just show the shelf.
     val suggestions: List<SellCandidate> =
-        remember(search, LiveStore.gadgets, LiveStore.parts, chosen) {
+        remember(search, LiveStore.gadgets, LiveStore.parts, chosen, myBranch) {
             if (chosen) return@remember emptyList()
             val q = search.trim().lowercase()
             fun hit(vararg f: String) = q.isBlank() || f.any { it.lowercase().contains(q) }
 
             val devices = LiveStore.gadgets
-                .filter { it.status == "In Stock" }
+                .filter { it.status == "In Stock" && it.current_branch == myBranch }
                 .filter { hit(it.imei_1, it.brand, it.model, it.sku, it.color) }
                 .map {
                     SellCandidate(
@@ -94,7 +96,7 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                     )
                 }
             val bulk = LiveStore.parts
-                .filter { it.stock_qty > 0 }
+                .filter { it.stock_qty > 0 && it.branch_location == myBranch }
                 .filter { hit(it.sku, it.part_name) }
                 .map {
                     SellCandidate(
@@ -136,7 +138,7 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 unitPrice = priceValue,
                 paymentMethod = payment,
                 customerName = customer.trim().ifBlank { null },
-                branch = part?.branch_location
+                branch = myBranch
             )
             busy = false
             when (outcome) {
@@ -168,6 +170,17 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
             ScreenHeader(title = "Sell", subtitle = "Ring up a phone or an accessory")
 
             ErrorBanner(formError)
+            
+            AppDropdown(
+                label = "Selling from",
+                selected = myBranch,
+                options = BranchStore.names,
+                onSelect = { 
+                    myBranch = it
+                    search = ""
+                    selected = ""
+                }
+            )
 
             SectionLabel("What is being sold")
 

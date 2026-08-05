@@ -732,6 +732,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
             gadgets={gadgets}
             parts={parts}
             sales={sales}
+            branches={branchNames}
             cashierName={session.user.email ?? ''}
             notify={notify}
             reload={loadAll}
@@ -2093,10 +2094,12 @@ function SalesTab({
   gadgets: RetailGadget[];
   parts: RepairPart[];
   sales: Sale[];
+  branches: string[];
   cashierName: string;
   notify: Notify;
   reload: () => Promise<void>;
 }) {
+  const [myBranch, setMyBranch] = useState(branches[0] || '');
   const [mode, setMode] = useState<'device' | 'accessory'>('device');
   const [imei, setImei] = useState('');
   const [partId, setPartId] = useState('');
@@ -2108,8 +2111,8 @@ function SalesTab({
   const [busy, setBusy] = useState(false);
   const [invoice, setInvoice] = useState<Sale | null>(null);
 
-  const sellableDevices = gadgets.filter((g) => g.status === 'In Stock');
-  const sellableParts = parts.filter((p) => p.stock_qty > 0);
+  const sellableDevices = gadgets.filter((g) => g.status === 'In Stock' && g.current_branch === myBranch);
+  const sellableParts = parts.filter((p) => p.stock_qty > 0 && p.branch_location === myBranch);
   const sellingDevice = sellableDevices.find((g) => g.imei_1 === imei);
   const sellingPart = sellableParts.find((p) => p.part_id === partId);
 
@@ -2148,7 +2151,7 @@ function SalesTab({
         p_unit_price: Number.isFinite(unitPrice) ? unitPrice : null,
         p_payment_method: payment,
         p_customer_name: customer.trim() || null,
-        p_branch: mode === 'accessory' ? sellingPart!.branch_location : null,
+        p_branch: myBranch,
       });
 
       if (error) {
@@ -2211,7 +2214,17 @@ function SalesTab({
           </p>
 
           <form onSubmit={submit}>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <Field label="Selling from">
+              <select className="form-input" value={myBranch} onChange={(e) => {
+                setMyBranch(e.target.value);
+                setImei('');
+                setPartId('');
+              }}>
+                {branches.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </Field>
+
+            <div style={{ display: 'flex', gap: 12, marginBottom: 16, marginTop: 16 }}>
               <button
                 type="button"
                 className={`btn ${mode === 'device' ? 'btn-primary' : 'btn-secondary'}`}

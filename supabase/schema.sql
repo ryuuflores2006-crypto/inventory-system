@@ -512,7 +512,7 @@ CREATE OR REPLACE FUNCTION record_sale(
     p_payment_method TEXT    DEFAULT 'Cash',
     p_customer_name  TEXT    DEFAULT NULL,
     p_customer_phone TEXT    DEFAULT NULL,
-    p_branch         TEXT    DEFAULT NULL,   -- Bulk only: which store's shelf
+    p_branch         TEXT,           -- Which store is making the sale
     p_notes          TEXT    DEFAULT NULL
 )
 RETURNS sales AS $$
@@ -529,6 +529,10 @@ BEGIN
         RAISE EXCEPTION 'Who is making this sale?';
     END IF;
 
+    IF COALESCE(trim(p_branch), '') = '' THEN
+        RAISE EXCEPTION 'You must specify which store is selling the item.';
+    END IF;
+
     IF p_item_type = 'Serialized' THEN
         SELECT * INTO g FROM retail_gadgets
          WHERE imei_1 = p_reference
@@ -536,6 +540,9 @@ BEGIN
 
         IF NOT FOUND THEN
             RAISE EXCEPTION 'No unit with IMEI % is on the books.', p_reference;
+        END IF;
+        IF g.current_branch <> p_branch THEN
+            RAISE EXCEPTION 'That unit is at %, not %.', g.current_branch, p_branch;
         END IF;
         IF g.status <> 'In Stock' THEN
             RAISE EXCEPTION 'That unit is %, not in stock.', g.status;
@@ -559,9 +566,7 @@ BEGIN
     ELSIF p_item_type = 'Bulk' THEN
         SELECT * INTO p FROM repair_parts
          WHERE sku = p_reference
-           AND (p_branch IS NULL OR branch_location = p_branch)
-         ORDER BY stock_qty DESC
-         LIMIT 1
+           AND branch_location = p_branch
          FOR UPDATE;
 
         IF NOT FOUND THEN
