@@ -424,9 +424,9 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
         )}
 
         {loadError && (
-          <div className="glass-panel" style={{ padding: 20, marginBottom: 20, borderColor: 'var(--color-danger)' }}>
+          <div className="glass-panel" style={{ padding: 20, marginBottom: 20, borderColor: '#f43f5e' }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              <AlertTriangle size={22} color="var(--color-danger)" />
+              <AlertTriangle size={22} color="#f43f5e" />
               <div>
                 <strong>Could not read the database.</strong>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>
@@ -439,7 +439,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
 
         {!isLoading && !loadError && !hasBranches && (
           <div className="glass-panel" style={{ padding: 24, marginBottom: 20, textAlign: 'center' }}>
-            <Store size={36} color="var(--color-primary)" />
+            <Store size={36} color="#06b6d4" />
             <h2 style={{ marginTop: 12 }}>No branches yet</h2>
             <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
               Add your first store to start logging stock, repairs and transfers.
@@ -465,11 +465,11 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
             marginBottom: 28,
           }}
         >
-          <MetricTile icon={<DollarSign size={24} color="var(--color-success)" />} tint="16,185,129" label="Cumulative revenue" value={peso(stats.revenue)} />
-          <MetricTile icon={<Smartphone size={24} color="var(--color-primary)" />} tint="6,182,212" label="Serialized phones" value={`${stats.inStock} in stock`} />
-          <MetricTile icon={<Wrench size={24} color="var(--color-info)" />} tint="59,130,246" label="Active repairs" value={`${stats.activeRepairs} jobs`} />
+          <MetricTile icon={<DollarSign size={24} color="#10b981" />} tint="16,185,129" label="Cumulative revenue" value={peso(stats.revenue)} />
+          <MetricTile icon={<Smartphone size={24} color="#06b6d4" />} tint="6,182,212" label="Serialized phones" value={`${stats.inStock} in stock`} />
+          <MetricTile icon={<Wrench size={24} color="#06b6d4" />} tint="59,130,246" label="Active repairs" value={`${stats.activeRepairs} jobs`} />
           <MetricTile
-            icon={<AlertTriangle size={24} color="var(--color-danger)" />}
+            icon={<AlertTriangle size={24} color="#f43f5e" />}
             tint="239,68,68"
             label="Low stock items"
             value={`${stats.lowStock} alerts`}
@@ -700,7 +700,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                           </td>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontWeight: 'bold', color: low ? 'var(--color-danger)' : 'inherit' }}>
+                              <span style={{ fontWeight: 'bold', color: low ? '#f43f5e' : 'inherit' }}>
                                 {p.stock_qty}
                               </span>
                               {low && (
@@ -806,11 +806,11 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                       <td>
                         {t.assigned_technician ? (
                           <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem' }}>
-                            <User size={12} color="var(--color-primary)" />
+                            <User size={12} color="#06b6d4" />
                             {t.assigned_technician}
                           </span>
                         ) : (
-                          <span style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--color-danger)' }}>
+                          <span style={{ fontStyle: 'italic', fontSize: '0.8rem', color: '#f43f5e' }}>
                             Unassigned
                           </span>
                         )}
@@ -1002,7 +1002,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                     <tr key={b.branch_id} style={{ opacity: b.is_active ? 1 : 0.5 }}>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
-                          {b.is_main && <Star size={13} color="var(--color-warning)" fill="currentColor" />}
+                          {b.is_main && <Star size={13} color="#f59e0b" fill="currentColor" />}
                           {b.name}
                         </div>
                       </td>
@@ -1108,7 +1108,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                   borderRadius: 12,
                 }}
               >
-                <h3 style={{ fontSize: '1.1rem', marginBottom: 16, color: 'var(--color-primary)' }}>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: 16, color: '#06b6d4' }}>
                   Sales distribution by branch
                 </h3>
                 {activeBranches.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No branches yet.</p>}
@@ -1142,7 +1142,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                             style={{
                               width: `${pct}%`,
                               height: '100%',
-                              background: 'linear-gradient(95deg, var(--color-primary), var(--color-info))',
+                              background: 'linear-gradient(95deg, #06b6d4, #06b6d4)',
                             }}
                           />
                         </div>
@@ -1160,14 +1160,14 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                   borderRadius: 12,
                 }}
               >
-                <h3 style={{ fontSize: '1.1rem', marginBottom: 16, color: 'var(--color-primary)' }}>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: 16, color: '#06b6d4' }}>
                   Repair pipeline
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <PipelineTile label="Pending / diagnosing" value={tickets.filter((t) => t.ticket_status === 'Pending' || t.ticket_status === 'Diagnosing').length} />
-                  <PipelineTile label="Waiting for parts" value={tickets.filter((t) => t.ticket_status === 'Waiting for Parts').length} color="var(--color-warning)" />
-                  <PipelineTile label="Repairing / ready" value={tickets.filter((t) => t.ticket_status === 'Repairing' || t.ticket_status === 'Ready').length} color="var(--color-info)" />
-                  <PipelineTile label="Completed" value={tickets.filter((t) => t.ticket_status === 'Completed').length} color="var(--color-success)" />
+                  <PipelineTile label="Waiting for parts" value={tickets.filter((t) => t.ticket_status === 'Waiting for Parts').length} color="#f59e0b" />
+                  <PipelineTile label="Repairing / ready" value={tickets.filter((t) => t.ticket_status === 'Repairing' || t.ticket_status === 'Ready').length} color="#06b6d4" />
+                  <PipelineTile label="Completed" value={tickets.filter((t) => t.ticket_status === 'Completed').length} color="#10b981" />
                 </div>
                 <button
                   className="btn btn-secondary"
@@ -1278,7 +1278,7 @@ function RowDelete({ label, onClick }: { label: string; onClick: () => void }) {
       aria-label={label}
       onClick={onClick}
       className="btn btn-secondary"
-      style={{ padding: '6px 8px', color: 'var(--color-danger)' }}
+      style={{ padding: '6px 8px', color: '#f43f5e' }}
     >
       <Trash2 size={15} />
     </button>
@@ -1303,7 +1303,7 @@ function MetricTile({
       <div style={{ padding: 12, background: `rgba(${tint},0.1)`, borderRadius: 12 }}>{icon}</div>
       <div>
         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{label}</div>
-        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: danger ? 'var(--color-danger)' : 'inherit' }}>
+        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: danger ? '#f43f5e' : 'inherit' }}>
           {value}
         </div>
       </div>
@@ -1323,7 +1323,7 @@ function PipelineTile({ label, value, color }: { label: string; value: number; c
 function BranchCell({ name }: { name: string }) {
   return (
     <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem' }}>
-      <MapPin size={12} color="var(--color-primary)" />
+      <MapPin size={12} color="#06b6d4" />
       {name}
     </span>
   );
@@ -2481,7 +2481,7 @@ function SalesTab({
                   <td>{s.cashier}</td>
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {s.status === 'Voided' ? (
-                      <span style={{ color: 'var(--color-danger)' }}>Voided</span>
+                      <span style={{ color: '#f43f5e' }}>Voided</span>
                     ) : (
                       peso(s.total_amount)
                     )}
@@ -2518,3 +2518,4 @@ function Line({ k, v }: { k: string; v: string }) {
     </div>
   );
 }
+
