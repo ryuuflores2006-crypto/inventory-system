@@ -123,6 +123,7 @@ object LiveStore {
 
         scope.launch {
             try {
+                SupabaseHelper.realtime.connect()
                 ch.subscribe(blockUntilSubscribed = true)
                 isLive = true
             } catch (e: Exception) {
@@ -151,6 +152,7 @@ object LiveStore {
         pendingRefresh?.cancel()
         pendingRefresh = null
         channel?.let { runCatching { SupabaseHelper.realtime.removeChannel(it) } }
+        runCatching { SupabaseHelper.realtime.disconnect() }
         channel = null
         isLive = false
         gadgets = emptyList()
