@@ -2087,6 +2087,7 @@ function SalesTab({
   gadgets,
   parts,
   sales,
+  branches,
   cashierName,
   notify,
   reload,
