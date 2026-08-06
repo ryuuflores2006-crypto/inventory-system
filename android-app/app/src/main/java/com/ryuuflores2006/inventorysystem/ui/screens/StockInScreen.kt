@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.ryuuflores2006.inventorysystem.data.BranchStore
 import com.ryuuflores2006.inventorysystem.data.RepairPart
 import com.ryuuflores2006.inventorysystem.data.RetailGadget
+import com.ryuuflores2006.inventorysystem.data.LiveStore
 import com.ryuuflores2006.inventorysystem.data.ScanResolver
 import com.ryuuflores2006.inventorysystem.data.SupabaseHelper
 import com.ryuuflores2006.inventorysystem.data.TacLookup
@@ -62,6 +63,23 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     var compatibleModelsInput by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
     var minThreshold by remember { mutableStateOf("5") }
+    var existingPart by remember { mutableStateOf<RepairPart?>(null) }
+
+    LaunchedEffect(sku, selectedBranch, isSerialized) {
+        if (!isSerialized && sku.isNotBlank()) {
+            val part = LiveStore.partsIn(selectedBranch).find { it.sku.equals(sku, ignoreCase = true) }
+            if (part != null) {
+                existingPart = part
+                partName = part.part_name
+                compatibleModelsInput = part.compatible_models.joinToString(", ")
+                minThreshold = part.minimum_stock_threshold.toString()
+                costPrice = part.cost_price.toString()
+                retailPrice = part.service_price.toString()
+            } else {
+                existingPart = null
+            }
+        }
+    }
 
     var isSubmitting by remember { mutableStateOf(false) }
     var formError by remember { mutableStateOf<String?>(null) }
@@ -340,21 +358,35 @@ fun StockInScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                                 )
                             )
                         } else {
-                            SupabaseHelper.insertPartStock(
-                                RepairPart(
-                                    sku = sku.trim(),
+                            if (existingPart != null) {
+                                val newQty = (existingPart?.stock_qty ?: 0) + (quantity.toIntOrNull() ?: 1)
+                                val updated = existingPart!!.copy(
                                     part_name = partName.trim(),
-                                    compatible_models = compatibleModelsInput
-                                        .split(",")
-                                        .map { it.trim() }
-                                        .filter { it.isNotBlank() },
-                                    branch_location = selectedBranch,
-                                    stock_qty = quantity.toIntOrNull() ?: 1,
+                                    compatible_models = compatibleModelsInput.split(",").map { it.trim() }.filter { it.isNotBlank() },
+                                    stock_qty = newQty,
                                     minimum_stock_threshold = minThreshold.toIntOrNull() ?: 5,
                                     cost_price = cost,
                                     service_price = retail
                                 )
-                            )
+                                val err = SupabaseHelper.updatePart(updated)
+                                err == null
+                            } else {
+                                SupabaseHelper.insertPartStock(
+                                    RepairPart(
+                                        sku = sku.trim(),
+                                        part_name = partName.trim(),
+                                        compatible_models = compatibleModelsInput
+                                            .split(",")
+                                            .map { it.trim() }
+                                            .filter { it.isNotBlank() },
+                                        branch_location = selectedBranch,
+                                        stock_qty = quantity.toIntOrNull() ?: 1,
+                                        minimum_stock_threshold = minThreshold.toIntOrNull() ?: 5,
+                                        cost_price = cost,
+                                        service_price = retail
+                                    )
+                                )
+                            }
                         }
                         isSubmitting = false
                         if (success) {

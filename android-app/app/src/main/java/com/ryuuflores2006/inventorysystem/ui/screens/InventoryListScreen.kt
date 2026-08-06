@@ -162,7 +162,10 @@ fun InventoryListScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
-                items(gadgets, key = { it.item_id ?: it.imei_1 }) { GadgetItemCard(it) }
+                val grouped = gadgets.groupBy { it.sku }
+                items(grouped.keys.toList(), key = { it }) { sku ->
+                    GadgetGroupCard(sku = sku, groupGadgets = grouped[sku]!!)
+                }
             }
 
             else -> LazyColumn(
@@ -176,64 +179,87 @@ fun InventoryListScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
 }
 
 @Composable
-fun GadgetItemCard(gadget: RetailGadget) {
+fun GadgetGroupCard(sku: String, groupGadgets: List<RetailGadget>) {
     var expanded by remember { mutableStateOf(false) }
-    var showEdit by remember { mutableStateOf(false) }
+    val first = groupGadgets.first()
 
     AppCard(onClick = { expanded = !expanded }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("${gadget.brand} ${gadget.model}", style = MaterialTheme.typography.titleLarge)
+                Text("${first.brand} ${first.model}", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    listOf(gadget.storage, gadget.ram, gadget.color).filter { it.isNotBlank() }
+                    listOf(first.storage, first.ram, first.color).filter { it.isNotBlank() }
                         .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            StatusPill(gadget.status, gadgetStatusColor(gadget.status))
+            StatusPill("${groupGadgets.size} Units", Emerald)
         }
 
         Spacer(Modifier.height(10.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                gadget.current_branch,
+                first.current_branch,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
-            Text(peso(gadget.retail_price), style = MaterialTheme.typography.titleLarge)
+            Text(peso(first.retail_price), style = MaterialTheme.typography.titleLarge)
         }
 
         if (expanded) {
             HorizontalDivider(color = GlassBorder, modifier = Modifier.padding(vertical = 12.dp))
-            DetailRow("SKU", gadget.sku)
-            DetailRow("IMEI 1", gadget.imei_1)
-            gadget.imei_2?.takeIf { it.isNotBlank() }?.let { DetailRow("IMEI 2", it) }
-            DetailRow("Cost", peso(gadget.cost_price))
-            DetailRow("Margin", peso(gadget.retail_price - gadget.cost_price), Emerald)
-            gadget.supplier_name?.takeIf { it.isNotBlank() }?.let { DetailRow("Supplier", it) }
-            DetailRow("Received", shortStamp(gadget.created_at))
-            RemoveRow(
-                what = "${gadget.brand} ${gadget.model}",
-                detail = "IMEI ${gadget.imei_1}",
-                blocked = when (gadget.status) {
-                    "Sold", "In Transit" -> "A ${gadget.status.lowercase()} unit cannot be deleted."
-                    else -> null
-                },
-                onConfirm = { SupabaseHelper.deleteGadget(gadget) },
-                onEdit = { showEdit = true }
-            )
-        } else {
-            Text(
-                "IMEI ${gadget.imei_1}",
-                style = MaterialTheme.typography.bodySmall,
-                color = Slate,
-                modifier = Modifier.padding(top = 6.dp)
-            )
+            DetailRow("SKU", sku)
+            DetailRow("Cost", peso(first.cost_price))
+            DetailRow("Margin", peso(first.retail_price - first.cost_price), Emerald)
+            
+            Spacer(Modifier.height(12.dp))
+            Text("Individual Units", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            
+            groupGadgets.forEach { gadget ->
+                GadgetUnitRow(gadget)
+            }
         }
+    }
+}
+
+@Composable
+fun GadgetUnitRow(gadget: RetailGadget) {
+    var showEdit by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "IMEI: ${gadget.imei_1}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            StatusPill(gadget.status, gadgetStatusColor(gadget.status))
+        }
+        
+        gadget.imei_2?.takeIf { it.isNotBlank() }?.let {
+            Text("IMEI 2: $it", style = MaterialTheme.typography.bodySmall, color = Slate)
+        }
+        gadget.supplier_name?.takeIf { it.isNotBlank() }?.let {
+            Text("Supplier: $it", style = MaterialTheme.typography.bodySmall, color = Slate)
+        }
+        Text("Received: ${shortStamp(gadget.created_at)}", style = MaterialTheme.typography.bodySmall, color = Slate)
+
+        RemoveRow(
+            what = "${gadget.brand} ${gadget.model}",
+            detail = "IMEI ${gadget.imei_1}",
+            blocked = when (gadget.status) {
+                "Sold", "In Transit" -> "A ${gadget.status.lowercase()} unit cannot be deleted."
+                else -> null
+            },
+            onConfirm = { SupabaseHelper.deleteGadget(gadget) },
+            onEdit = { showEdit = true }
+        )
     }
 
     if (showEdit) {
