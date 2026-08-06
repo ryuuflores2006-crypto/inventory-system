@@ -62,6 +62,7 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
   const [branches, setBranches] = useState<Branch[]>([]);
   const [gadgets, setGadgets] = useState<RetailGadget[]>([]);
   const [parts, setParts] = useState<RepairPart[]>([]);
+  const [expandedSkus, setExpandedSkus] = useState<Set<string>>(new Set());
   const [tickets, setTickets] = useState<ServiceTicket[]>([]);
   const [transfers, setTransfers] = useState<BranchTransfer[]>([]);
   const [ticketPartsUsed, setTicketPartsUsed] = useState<TicketPartsUsed[]>([]);
@@ -183,6 +184,15 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
       ),
     [gadgets, selectedBranch, q]
   );
+
+  const groupedGadgets = useMemo(() => {
+    const groups = new Map<string, RetailGadget[]>();
+    for (const g of filteredGadgets) {
+      if (!groups.has(g.sku)) groups.set(g.sku, []);
+      groups.get(g.sku)!.push(g);
+    }
+    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filteredGadgets]);
 
   const filteredParts = useMemo(
     () =>
@@ -621,71 +631,123 @@ function Dashboard({ session, signOut }: { session: Session; signOut: () => Prom
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredGadgets.map((g) => (
-                      <tr key={g.item_id}>
-                        <td>
-                          <div style={{ fontWeight: 600 }}>
-                            {g.brand} {g.model}
-                          </div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            {g.storage} / {g.ram} | {g.color}
-                          </div>
-                        </td>
-                        <td>
-                          <code style={{ fontSize: '0.85rem' }}>{g.sku}</code>
-                        </td>
-                        <td>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{g.imei_1}</div>
-                          {g.imei_2 && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{g.imei_2}</div>
-                          )}
-                        </td>
-                        <td>
-                          <BranchCell name={g.current_branch} />
-                        </td>
-                        <td style={{ fontSize: '0.85rem' }}>{g.supplier_name || '—'}</td>
-                        <td>
-                          <select
-                            value={g.status}
-                            className="form-input"
-                            style={{ padding: '4px 8px', fontSize: '0.8rem', width: 'auto' }}
-                            onChange={(e) =>
-                              run('Status update', () =>
-                                supabase.from('retail_gadgets').update({ status: e.target.value }).eq('item_id', g.item_id)
-                              )
-                            }
+                    {groupedGadgets.map(([sku, group]) => {
+                      const isExpanded = expandedSkus.has(sku);
+                      const toggle = () => {
+                        const next = new Set(expandedSkus);
+                        if (isExpanded) next.delete(sku);
+                        else next.add(sku);
+                        setExpandedSkus(next);
+                      };
+                      const first = group[0];
+                      return (
+                        <React.Fragment key={sku}>
+                          <tr
+                            style={{
+                              background: isExpanded ? 'rgba(255,255,255,0.05)' : 'transparent',
+                              cursor: 'pointer',
+                            }}
+                            onClick={toggle}
                           >
-                            {/* Sold is not something you set — it is what a
-                                sale leaves behind. Picking it here made money
-                                appear with no invoice, price or cashier, so it
-                                is only offered on a unit that already is one,
-                                to keep the dropdown from looking broken. */}
-                            {GADGET_STATUSES.filter((s) => s !== 'Sold' || g.status === 'Sold').map((s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span
+                                  style={{
+                                    transform: isExpanded ? 'rotate(90deg)' : 'none',
+                                    transition: 'transform 0.2s',
+                                    display: 'inline-block',
+                                    fontSize: '0.8rem',
+                                  }}
+                                >
+                                  ▶
+                                </span>
+                                <div>
+                                  <div style={{ fontWeight: 600 }}>
+                                    {first.brand} {first.model}
+                                  </div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                    {first.storage} / {first.ram} | {first.color}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <code style={{ fontSize: '0.85rem' }}>{sku}</code>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 'bold' }}>
+                                {group.length} unit{group.length !== 1 ? 's' : ''}
+                              </div>
+                            </td>
+                            <td>
+                              <BranchCell name={first.current_branch} />
+                            </td>
+                            <td style={{ fontSize: '0.85rem' }}>{first.supplier_name || '—'}</td>
+                            <td>—</td>
+                            <td style={{ fontSize: '0.9rem' }}>{peso(first.cost_price)}</td>
+                            <td style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>{peso(first.retail_price)}</td>
+                            <td></td>
+                          </tr>
+                          {isExpanded &&
+                            group.map((g) => (
+                              <tr key={g.item_id} style={{ background: 'rgba(0,0,0,0.2)' }}>
+                                <td style={{ paddingLeft: 40 }}>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Individual unit</div>
+                                </td>
+                                <td></td>
+                                <td>
+                                  <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{g.imei_1}</div>
+                                  {g.imei_2 && (
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{g.imei_2}</div>
+                                  )}
+                                </td>
+                                <td></td>
+                                <td></td>
+                                <td>
+                                  <select
+                                    value={g.status}
+                                    className="form-input"
+                                    style={{ padding: '4px 8px', fontSize: '0.8rem', width: 'auto' }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) =>
+                                      run('Status update', () =>
+                                        supabase
+                                          .from('retail_gadgets')
+                                          .update({ status: e.target.value })
+                                          .eq('item_id', g.item_id)
+                                      )
+                                    }
+                                  >
+                                    {GADGET_STATUSES.filter((s) => s !== 'Sold' || g.status === 'Sold').map((s) => (
+                                      <option key={s} value={s}>
+                                        {s}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td></td>
+                                <td></td>
+                                <td>
+                                  <div style={{ display: 'flex', gap: 6 }}>
+                                    <button
+                                      className="btn btn-secondary"
+                                      style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingDevice(g);
+                                        setShowDeviceModal(true);
+                                      }}
+                                    >
+                                      <Pencil size={13} />
+                                    </button>
+                                    <RowDelete label={`Delete ${g.brand} ${g.model}`} onClick={() => deleteGadget(g)} />
+                                  </div>
+                                </td>
+                              </tr>
                             ))}
-                          </select>
-                        </td>
-                        <td style={{ fontSize: '0.9rem' }}>{peso(g.cost_price)}</td>
-                        <td style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>{peso(g.retail_price)}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button
-                              className="btn btn-secondary"
-                              style={{ padding: '6px 10px', fontSize: '0.75rem' }}
-                              onClick={() => {
-                                setEditingDevice(g);
-                                setShowDeviceModal(true);
-                              }}
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            <RowDelete label={`Delete ${g.brand} ${g.model}`} onClick={() => deleteGadget(g)} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                        </React.Fragment>
+                      );
+                    })}
                     <EmptyRow span={9} show={filteredGadgets.length === 0} text="No devices logged yet. Use “Add device”." />
                   </tbody>
                 </table>
