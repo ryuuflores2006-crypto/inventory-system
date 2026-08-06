@@ -140,20 +140,7 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
         UpdateManager.check(context)
     }
 
-    if (isScannerActive && onScannedCallback != null) {
-        BarcodeScanScreen(
-            onBarcodeScanned = { scannedValue ->
-                onScannedCallback?.invoke(scannedValue)
-                isScannerActive = false
-                onScannedCallback = null
-            },
-            onClose = {
-                isScannerActive = false
-                onScannedCallback = null
-            }
-        )
-        return
-    }
+    Box(modifier = Modifier.fillMaxSize()) {
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -237,5 +224,21 @@ fun MainScreenContainer(onSignOut: () -> Unit) {
         }
     }
 
+    if (isScannerActive && onScannedCallback != null) {
+        BarcodeScanScreen(
+            onBarcodeScanned = { scannedValue ->
+                onScannedCallback?.invoke(scannedValue)
+                isScannerActive = false
+                onScannedCallback = null
+            },
+            onClose = {
+                isScannerActive = false
+                onScannedCallback = null
+            }
+        )
+    }
+
+    }
+    
     UpdateDialog()
 }
