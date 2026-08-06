@@ -2168,6 +2168,7 @@ function SalesTab({
   const [cashier, setCashier] = useState(cashierName);
   const [busy, setBusy] = useState(false);
   const [invoice, setInvoice] = useState<Sale | null>(null);
+  const [branchOnly, setBranchOnly] = useState(true);
 
   const sellableDevices = gadgets.filter((g) => g.status === 'In Stock' && g.current_branch === myBranch);
   const sellableParts = parts.filter((p) => p.stock_qty > 0 && p.branch_location === myBranch);
@@ -2256,7 +2257,10 @@ function SalesTab({
     }
   };
 
-  const completed = sales.filter((s) => s.status === 'Completed');
+  // The cashier is standing at one counter; that counter's takings are what
+  // gets reconciled at close. The other shops are one click away, not gone.
+  const visibleSales = branchOnly ? sales.filter((s) => s.branch_location === myBranch) : sales;
+  const completed = visibleSales.filter((s) => s.status === 'Completed');
   const today = new Date().toDateString();
   const grossToday = completed
     .filter((s) => new Date(s.sold_at).toDateString() === today)
@@ -2501,8 +2505,19 @@ function SalesTab({
           }}
         >
           <h2 style={{ margin: 0 }}>Sales history</h2>
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            {peso(grossToday)} today · {completed.length} completed sale{completed.length === 1 ? '' : 's'} on record
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              {peso(grossToday)} today · {completed.length} completed sale{completed.length === 1 ? '' : 's'}
+              {branchOnly ? ` at ${myBranch}` : ' across all stores'}
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ padding: '6px 12px' }}
+              onClick={() => setBranchOnly((v) => !v)}
+            >
+              {branchOnly ? 'Show all stores' : `Show only ${myBranch}`}
+            </button>
           </div>
         </div>
 
@@ -2521,7 +2536,7 @@ function SalesTab({
               </tr>
             </thead>
             <tbody>
-              {sales.map((s) => (
+              {visibleSales.map((s) => (
                 <tr key={s.sale_id} style={s.status === 'Voided' ? { opacity: 0.55 } : undefined}>
                   <td style={{ fontFamily: 'monospace' }}>{s.invoice_no}</td>
                   <td>{new Date(s.sold_at).toLocaleString()}</td>
@@ -2558,7 +2573,11 @@ function SalesTab({
                   </td>
                 </tr>
               ))}
-              <EmptyRow span={8} show={sales.length === 0} text="No sales recorded yet." />
+              <EmptyRow
+                span={8}
+                show={visibleSales.length === 0}
+                text={branchOnly ? `No sales at ${myBranch} yet.` : 'No sales recorded yet.'}
+              />
             </tbody>
           </table>
         </div>

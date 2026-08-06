@@ -61,6 +61,7 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
     var receipt by remember { mutableStateOf<Sale?>(null) }
     var voiding by remember { mutableStateOf<Sale?>(null) }
     var myBranch by rememberSaveable { mutableStateOf(BranchStore.defaultName) }
+    var branchOnlySales by rememberSaveable { mutableStateOf(true) }
 
     val gadget: RetailGadget? = remember(selected, LiveStore.gadgets) {
         selected.takeIf { it.isNotBlank() }?.let { ref ->
@@ -150,8 +151,15 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
         }
     }
 
-    val today = LiveStore.sales.take(40)
-    val takings = LiveStore.completedSales.sumOf { it.total_amount }
+    // A cashier standing at one counter cares about that counter's takings.
+    // Sales from the other shops are still one tap away, but they no longer
+    // muddle the running total the person on shift is trying to reconcile.
+    val branchOnly = branchOnlySales
+    val visibleSales = remember(LiveStore.sales, myBranch, branchOnly) {
+        if (branchOnly) LiveStore.sales.filter { it.branch_location == myBranch } else LiveStore.sales
+    }
+    val today = visibleSales.take(40)
+    val takings = visibleSales.filter { !it.isVoided }.sumOf { it.total_amount }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -311,13 +319,30 @@ fun SellScreen(onScanClick: (onScanned: (String) -> Unit) -> Unit) {
             }
 
             Spacer(Modifier.height(6.dp))
-            SectionLabel("Recent sales · ${peso(takings)} in total")
+            SectionLabel(
+                if (branchOnly) "Recent sales at $myBranch · ${peso(takings)} in total"
+                else "Recent sales · all stores · ${peso(takings)} in total"
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = branchOnly,
+                    onClick = { branchOnlySales = true },
+                    label = { Text("This store") }
+                )
+                FilterChip(
+                    selected = !branchOnly,
+                    onClick = { branchOnlySales = false },
+                    label = { Text("All stores") }
+                )
+            }
 
             if (today.isEmpty()) {
                 EmptyState(
                     icon = Icons.Default.ReceiptLong,
-                    title = "No sales recorded",
-                    message = "Every sale you ring up here keeps its own receipt."
+                    title = if (branchOnly) "No sales at $myBranch yet" else "No sales recorded",
+                    message = if (branchOnly) "Switch to All stores to see the other shops."
+                    else "Every sale you ring up here keeps its own receipt."
                 )
             } else {
                 today.forEach { sale ->
